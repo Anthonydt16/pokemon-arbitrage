@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Search {
+  id        String   @id @default(cuid())
+  name      String
+  keywords  String
+  platforms String
+  minPrice  Float    @default(0)
+  maxPrice      Float
+  active        Boolean   @default(true)
+  isGlobal      Boolean   @default(false) // true = scan automatique quotidien
+  lastAvgPrice  Float?    // Moyenne marché calculée au dernier scan
+  lastScrapeAt  DateTime? // Date du dernier scan
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deals         Deal[]
+}
+
+model Deal {
+  id              String   @id @default(cuid())
+  searchId        String
+  search          Search   @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  title           String
+  price           Float
+  url             String   @unique
+  platform        String
+  imageUrl        String?
+  cardMarketPrice Float?
+  margin          Float?
+  location        String?
+  status          String   @default("new")
+  foundAt         DateTime @default(now())
+  trustScore      Int?     // 0-100
+  trustLevel      String?  // "safe" | "check" | "suspect"
+  trustFlags      String?  // JSON array des flags négatifs
+  photoCount      Int?     // nombre de photos de l'annonce
+  isPro           Boolean? // vendeur pro ou particulier
+}
+
+model Settings {
+  id             String  @id @default("default")
+  discordWebhook String? // URL du webhook Discord
+  alertMinMargin Float   @default(15) // Seuil de marge minimum pour alerter
+  alertGlobal    Boolean @default(true)  // Alerter aussi pour le scan global
+  updatedAt      DateTime @updatedAt
+}
