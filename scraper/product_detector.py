@@ -12,8 +12,8 @@ PRODUCT_TYPES = [
     ('upc',       r'ultra\s*premium|upc\b'),
     ('tripack',   r'\btripack\b|3\s*boosters?\s*(sous\s*blister|blister)|blister\s*3'),
     ('blister',   r'\bblister\b|\bsous[\s-]blister\b'),
-    ('booster',   r'\bbooster\b|\bboosters?\s*(scell|neuf|pokémon|pokemon)'),
     ('lot',       r'\blot\s*(de\s*)?\d+|\blot\s+boosters?|\blot\s+pokemon'),
+    ('booster',   r'\bbooster\b|\bboosters?\s*(scell|neuf|pokémon|pokemon)'),
     ('etb',       r'\betb\b|coffret\s*dresseur|elite\s*trainer'),
     ('coffret',   r'\bcoffret\b|\bcollection\b'),
 ]
