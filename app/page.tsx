@@ -78,9 +78,9 @@ function DealCard({ deal, onStatus, onDelete }: {
               </span>
             )}
             {trust && (
-              <div className="relative group">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-default ${trust.className}`}>
-                  {trustEmoji} {trust.label}
+              <div className="relative group flex-shrink-0">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-default whitespace-nowrap inline-flex items-center gap-1 ${trust.className}`}>
+                  <span>{trustEmoji}</span><span>{trust.label}</span>
                 </span>
                 {flags.length > 0 && (
                   <div className="absolute right-0 top-6 z-10 hidden group-hover:block bg-gray-800 border border-gray-700 rounded-lg p-2 min-w-max shadow-lg">

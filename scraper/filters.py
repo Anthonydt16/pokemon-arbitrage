@@ -37,6 +37,18 @@ NEGATIVE_KEYWORDS = [
     'poster', 'sticker', 'autocollant', 'figurine', 'peluche',
     'jeu vidéo', 'jeu video', 'nintendo ds', 'gameboy',
     'lego', 'nanoblock', 'funko',
+    # Dérivés / goodies — exclusion explicite
+    'pop pokemon', 'funko pop', 'pop vinyl', 'pop figure',
+    'pin pokemon', "pin's pokemon", "pin's pokémon", 'pins pokemon', 'pins pokémon',
+    'porte-clé', 'porte clé', 'porte-clés', 'porte clés',
+    't-shirt', 'tshirt', 'sweat', 'casquette', 'sac ', 'sacoche',
+    'peluche pokemon', 'doudou', 'pyjama',
+    'tasse', 'mug ', 'verre ', 'assiette',
+    'boite de rangement', 'boîte de rangement',
+    'carte cadeau', 'bon cadeau',
+    'goodies', 'gadget', 'dérivé',
+    'pokeball décorative', 'réplique pokeball',
+    'puzzle', 'jeu de société',
     # Fakes
     'proxy', 'orica', 'fan art', 'réplique', 'replica',
     'décoration', 'custom', 'fanmade',

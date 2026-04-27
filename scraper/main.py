@@ -16,6 +16,7 @@ from filters import filter_results, is_foreign_card
 from notifier import send_deal_alert
 from price_reference import get_reference_price
 from trust_score import compute_trust
+from product_detector import group_by_product
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
 API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
@@ -142,39 +143,51 @@ def run_scraper():
             print("  → Aucun résultat valide après filtre")
             continue
 
-        # Stats marché
-        stats = compute_stats(results)
-        if not stats:
+        # Stats marché globales (fallback)
+        global_stats = compute_stats(results)
+        if not global_stats:
             continue
 
-        median = stats['median']
-        update_stats(search['id'], stats['avg'])
-
-        print(f"  📊 {stats['count']} annonces | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
+        # Groupe par produit pour médiane per-produit
+        groups = group_by_product(results)
 
         # Deals
         deals_found = 0
-        for item in sorted(results, key=lambda x: x['price']):
-            # Référence de prix : TCGPlayer pour singles, médiane pour scellés
-            ref = get_reference_price(item['title'], kw, median, stats['count'])
-            ref_price = ref['reference_price']
-            margin = ((ref_price - item['price']) / ref_price) * 100
-            if margin < MIN_MARGIN:
-                continue
-            # Trust score
-            trust = compute_trust(item, median, kw)
-            item['trustScore'] = trust['score']
-            item['trustLevel'] = trust['level']
-            item['trustFlags'] = json.dumps(trust['flags'], ensure_ascii=False)
-            # Stocke le prix de référence réel (TCG ou médiane)
-            item['_ref_source'] = ref['source']
-            if save_deal_with_retry(search['id'], item, ref_price, margin):
-                deals_found += 1
-                total_deals += 1
-                src = '📊TCG' if ref['source'] == 'tcgplayer' else '📉méd'
-                emoji = '🔥' if margin >= 35 else '✅'
-                print(f"  {emoji} {item['price']}€ (-{margin:.0f}%) [{src}] — {item['title'][:50]} [{item['platform']}]")
-                send_deal_alert(item, search['name'], ref_price, margin, confidence)
+        for product_name, product_items in groups.items():
+            stats = compute_stats(product_items)
+            # Fallback sur médiane globale si pas assez d'annonces par produit
+            if not stats or stats['count'] < 3:
+                stats = global_stats
+                used_fallback = True
+            else:
+                used_fallback = False
+
+            median = stats['median']
+            update_stats(search['id'], stats['avg'])
+
+            label = f"{product_name} (fallback global)" if used_fallback else product_name
+            print(f"  📊 [{label}] {stats['count']} annonces | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
+
+            for item in sorted(product_items, key=lambda x: x['price']):
+                # Référence de prix : TCGPlayer pour singles, médiane pour scellés
+                ref = get_reference_price(item['title'], kw, median, stats['count'])
+                ref_price = ref['reference_price']
+                margin = ((ref_price - item['price']) / ref_price) * 100
+                if margin < MIN_MARGIN:
+                    continue
+                # Trust score
+                trust = compute_trust(item, median, kw)
+                item['trustScore'] = trust['score']
+                item['trustLevel'] = trust['level']
+                item['trustFlags'] = json.dumps(trust['flags'], ensure_ascii=False)
+                item['_ref_source'] = ref['source']
+                if save_deal_with_retry(search['id'], item, ref_price, margin):
+                    deals_found += 1
+                    total_deals += 1
+                    src = '📊TCG' if ref['source'] == 'tcgplayer' else '📉méd'
+                    emoji = '🔥' if margin >= 35 else '✅'
+                    print(f"  {emoji} {item['price']}€ (-{margin:.0f}%) [{src}] — {item['title'][:50]} [{item['platform']}]")
+                    send_deal_alert(item, search['name'], ref_price, margin, confidence)
 
         if not deals_found:
             best = sorted(results, key=lambda x: x['price'])[:1]
