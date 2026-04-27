@@ -19,6 +19,8 @@ from trust_score import compute_trust, _detect_product_type, _normalize
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
 API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
+SCRAPER_API_KEY = os.environ.get('SCRAPER_API_KEY', 'scraper-internal-key-2026')
+SCRAPER_HEADERS = {'x-scraper-key': SCRAPER_API_KEY}
 DEAL_THRESHOLD_PCT = 15
 
 GLOBAL_CATALOG = [
@@ -79,7 +81,7 @@ def get_or_create_search(name, keywords, platforms, min_p, max_p):
         r = requests.post(f"{API_BASE}/searches", json={
             'name': name, 'keywords': keywords, 'platforms': platforms,
             'minPrice': min_p, 'maxPrice': max_p, 'active': True, 'isGlobal': True,
-        }, timeout=10)
+        }, headers=SCRAPER_HEADERS, timeout=10)
         return r.json()['id'] if r.status_code == 200 else None
     except Exception as e:
         print(f"  [DB] get_or_create: {e}")

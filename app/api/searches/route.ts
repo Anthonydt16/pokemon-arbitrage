@@ -3,6 +3,12 @@ import { NextResponse, NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || 'scraper-internal-key-2026'
+
+function isScraperRequest(req: NextRequest): boolean {
+  return req.headers.get('x-scraper-key') === SCRAPER_API_KEY
+}
+
 export async function GET(req: NextRequest) {
   const user = getAuthUser(req)
   
@@ -52,7 +58,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = getAuthUser(req)
-  if (!user) {
+  const scraper = isScraperRequest(req)
+
+  if (!user && !scraper) {
     return NextResponse.json({ error: 'Authentification requise' }, { status: 401 })
   }
 
@@ -66,8 +74,8 @@ export async function POST(req: NextRequest) {
       minPrice: parseFloat(minPrice ?? 0),
       maxPrice: parseFloat(maxPrice),
       active: active ?? true,
-      isGlobal: false, // users can never create global searches
-      userId: user.userId,
+      isGlobal: scraper ? (body.isGlobal ?? false) : false, // only scraper can set isGlobal
+      userId: scraper ? null : user!.userId,
     },
   })
   return NextResponse.json({
