@@ -15,6 +15,7 @@ import time
 import statistics
 import sys
 import os
+import re as _re
 sys.path.insert(0, os.path.dirname(__file__))
 from filters import is_foreign_card
 
@@ -27,12 +28,33 @@ SEALED_KEYWORDS = [
     'boite boosters', 'collection premium',
 ]
 
+# Regex de détection fine pour éviter de classer un booster individuel
+# comme produit scellé uniquement parce que "ETB" apparaît dans son titre.
+_BOOSTER_RE_SEALED = _re.compile(r'\bbooster\b')
+_ETB_RE_SEALED     = _re.compile(r'\b(etb|elite\s*trainer|coffret\s*dresseur)\b')
+
 _cache: dict = {}
 CACHE_TTL = 3600 * 6  # 6h
 
 
 def _is_sealed(title: str, keywords: list = None) -> bool:
+    """
+    Retourne True si le titre/keywords désignent un produit scellé
+    (ETB box, display, coffret…).
+
+    Correction bug #1 : si le titre contient "booster" ET "etb", le produit
+    vendu est un booster individuel (ex: "Booster Flammes Obsidienne ETB"),
+    pas une ETB box complète — on ne le classe donc PAS comme scellé ETB.
+    """
     text = (title + ' ' + ' '.join(keywords or [])).lower()
+
+    # Si ETB est mentionné conjointement avec "booster", c'est un booster
+    # qui provient d'un ETB — pas une ETB box elle-même.
+    if _ETB_RE_SEALED.search(text) and _BOOSTER_RE_SEALED.search(text):
+        # On vérifie que ce n'est pas un display/box pour ne pas sous-classer
+        if not _re.search(r'\b(display|36\s*boosters?|booster\s*box)\b', text):
+            return False
+
     return any(kw in text for kw in SEALED_KEYWORDS)
 
 
@@ -68,7 +90,6 @@ def _get_tcgdex_price(pokemon_fr: str, title: str = '') -> float | None:
     Si un numéro de carte est détecté dans le titre (ex: 9/68),
     on cherche la carte exacte pour un prix précis.
     """
-    import re as _re
     if not pokemon_fr:
         return None
 

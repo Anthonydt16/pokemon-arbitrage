@@ -3,6 +3,7 @@ trust_score.py — Calcule un score de confiance (0-100) pour chaque deal Pokém
 """
 
 import re
+import unicodedata
 
 KNOWN_EXTENSIONS = [
     'evolutions prismatiques', 'destinees paldea', 'pokemon 151',
@@ -21,10 +22,64 @@ PRICE_FLOORS = {
     'upc': 60,
 }
 
+# Ordre de détection du type produit : du plus spécifique au plus général.
+# Règle clé : si le titre contient "booster" ET "etb", c'est un booster
+# (ex: "Booster Flammes Obsidienne ETB") — pas une ETB box.
+_PRODUCT_TYPE_PATTERNS = [
+    ('display',       re.compile(r'\b(display|36\s*boosters?|booster\s*box)\b')),
+    ('ultra premium', re.compile(r'\b(ultra\s*premium|upc)\b')),
+    ('lot boosters',  re.compile(r'\blot\s*(de\s*)?(boosters?|bo[iî]tes?)\b')),
+    # ETB uniquement si "booster" n'est pas également présent en tant que type dominant
+    ('etb',           re.compile(r'\b(etb|elite\s*trainer|coffret\s*dresseur)\b')),
+    ('booster',       re.compile(r'\bbooster\b')),
+]
+_BOOSTER_RE = re.compile(r'\bbooster\b')
+_ETB_RE     = re.compile(r'\b(etb|elite\s*trainer|coffret\s*dresseur)\b')
+
+
+def _detect_product_type(title_norm: str) -> tuple:
+    """
+    Détecte le type de produit dominant à partir du titre normalisé.
+    Retourne (product_type, price_floor) ou (None, None) si non reconnu.
+
+    Correction bug #1 : un booster dont le titre mentionne aussi "ETB"
+    (ex: "Booster Flammes Obsidienne ETB scellé neuf") est classifié
+    comme booster, pas comme ETB box.
+    """
+    # Display / box complète → priorité absolue
+    if re.search(r'\b(display|36\s*boosters?|booster\s*box)\b', title_norm):
+        return 'display', PRICE_FLOORS['display']
+
+    # Ultra Premium Collection
+    if re.search(r'\b(ultra\s*premium|upc)\b', title_norm):
+        return 'ultra premium', PRICE_FLOORS['ultra premium']
+
+    # Lot de boosters
+    if re.search(r'\blot\s*(de\s*)?(boosters?|bo[iî]tes?)\b', title_norm):
+        return 'lot boosters', PRICE_FLOORS['lot boosters']
+
+    has_etb     = bool(_ETB_RE.search(title_norm))
+    has_booster = bool(_BOOSTER_RE.search(title_norm))
+
+    # ETB box : contient "etb/coffret dresseur/elite trainer" SANS "booster" isolé
+    # Règle : "ETB" dans le titre ne suffit pas si le produit vendu est un booster
+    if has_etb and not has_booster:
+        return 'etb', PRICE_FLOORS['etb']
+
+    # Coffret dresseur sans le mot booster (ex: "coffret dresseur ecarlate")
+    if has_etb and has_booster:
+        # Les deux mots sont présents → le vendeur vend un booster ISSU d'un ETB
+        # On classe comme booster (type réel du produit vendu)
+        return 'booster', PRICE_FLOORS['booster']
+
+    if has_booster:
+        return 'booster', PRICE_FLOORS['booster']
+
+    return None, None
+
 
 def _normalize(text: str) -> str:
     """Lowercase + remove accents for fuzzy matching."""
-    import unicodedata
     nfkd = unicodedata.normalize('NFKD', text.lower())
     return ''.join(c for c in nfkd if not unicodedata.combining(c))
 
@@ -110,11 +165,9 @@ def compute_trust(item: dict, median: float, keywords: list) -> dict:
         score += 8  # particulier ou inconnu
 
     # ── Critère 5 — Prix plancher cohérent (10 pts) ──────────────────────────
-    detected_floor = None
-    for product_key, floor in PRICE_FLOORS.items():
-        if product_key in title_norm:
-            detected_floor = floor
-            break
+    # Utilise _detect_product_type pour éviter de classifier un booster comme ETB
+    # simplement parce que "ETB" apparaît dans son titre (bug #1).
+    _, detected_floor = _detect_product_type(title_norm)
 
     if detected_floor is not None:
         if price >= detected_floor:
