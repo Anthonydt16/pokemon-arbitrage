@@ -5,8 +5,68 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
-from trust_score import compute_trust
+from trust_score import compute_trust, _detect_product_type, _normalize
 
+
+# ── _detect_product_type ─────────────────────────────────────────────────────────────
+
+def test_detect_etb():
+    """Titre ETB sans 'booster' → type etb."""
+    t, _ = _detect_product_type(_normalize('ETB Flammes Obsidiennes coffret dresseur'))
+    assert t == 'etb'
+
+
+def test_detect_booster_etb_bug1():
+    """Bug #1 : 'Booster Flammes Obsidiennes ETB' doit être booster, pas etb."""
+    t, _ = _detect_product_type(_normalize('Booster Flammes Obsidiennes ETB scellé neuf'))
+    assert t == 'booster'
+
+
+def test_detect_tripack_bug2():
+    """Bug #2 : 'Tripack Flammes Obsidiennes' doit être tripack, ni ETB ni booster."""
+    t, _ = _detect_product_type(_normalize('Tripack Flammes Obsidiennes scellé neuf'))
+    assert t == 'tripack'
+
+
+def test_detect_tripack_blister():
+    """Blister 3 boosters → tripack."""
+    t, _ = _detect_product_type(_normalize('Blister 3 boosters Pokémon 151 scellé'))
+    assert t == 'tripack'
+
+
+def test_detect_display():
+    """Display → type display, plancher 90."""
+    t, floor = _detect_product_type(_normalize('Display 36 boosters Pokémon 151'))
+    assert t == 'display'
+    assert floor == 90
+
+
+def test_detect_ultra_premium():
+    """UPC → ultra premium."""
+    t, _ = _detect_product_type(_normalize('Ultra Premium Collection Dracaufeu'))
+    assert t == 'ultra premium'
+
+
+def test_detect_lot_boosters():
+    """Lot de boosters → lot boosters."""
+    t, _ = _detect_product_type(_normalize('Lot de 10 boosters Pokémon scellés'))
+    assert t == 'lot boosters'
+
+
+def test_detect_coffret_generique():
+    """Coffret générique sans ETB → coffret."""
+    t, _ = _detect_product_type(_normalize('Coffret Dracaufeu EX scellé neuf'))
+    assert t == 'coffret'
+
+
+def test_tripack_has_floor():
+    """Le plancher tripack est défini et réaliste."""
+    t, floor = _detect_product_type(_normalize('Tripack Couronne Stellaire neuf'))
+    assert t == 'tripack'
+    assert floor >= 5
+
+
+# ── compute_trust ─────────────────────────────────────────────────────────────────────
 
 def test_deal_parfait_safe():
     """Deal avec tous les critères au max → level safe."""

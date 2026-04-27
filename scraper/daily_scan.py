@@ -15,7 +15,7 @@ from scrapers.ebay import scrape as scrape_ebay
 from filters import filter_results, is_sealed_product
 from notifier import send_deal_alert, send_daily_summary
 from price_reference import get_reference_price
-from trust_score import compute_trust
+from trust_score import compute_trust, _detect_product_type, _normalize
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
 API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
@@ -49,6 +49,13 @@ GLOBAL_CATALOG = [
     # ── Boosters à l'unité & petits lots ─────────────────────
     {'name': 'Booster Évolutions Prismatiques', 'keywords': ['booster evolutions prismatiques', 'booster ev8.5 pokemon scelle'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 4, 'maxPrice': 30},
     {'name': 'Lot boosters scellés Pokémon', 'keywords': ['lot boosters pokemon scelle neuf'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10, 'maxPrice': 200},
+    # ── Tripack (blister 3 boosters) ─────────────────────────
+    {'name': 'Tripack Flammes Obsidiennes',       'keywords': ['tripack flammes obsidiennes', 'blister 3 boosters ev3'],     'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 40},
+    {'name': 'Tripack Évolutions Prismatiques',   'keywords': ['tripack evolutions prismatiques', 'blister 3 boosters ev8.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10, 'maxPrice': 50},
+    {'name': 'Tripack Pokémon 151',               'keywords': ['tripack pokemon 151', 'blister 3 boosters ev3.5'],            'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10, 'maxPrice': 50},
+    {'name': 'Tripack Destinées de Paldea',       'keywords': ['tripack destinees paldea', 'blister 3 boosters ev4.5'],      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 35},
+    {'name': 'Tripack Couronne Stellaire',        'keywords': ['tripack couronne stellaire', 'blister 3 boosters ev7'],      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 35},
+    {'name': 'Tripack Forces Temporelles',        'keywords': ['tripack forces temporelles', 'blister 3 boosters ev5'],      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 35},
     # ── Cartes rares singles — EXCLUS du scan global (faussent la médiane) ──
     # Singles à gérer dans les recherches personnalisées uniquement
     # {'name': 'Dracaufeu carte rare', ...}
@@ -197,16 +204,36 @@ def run_daily_scan():
             print("  → Aucun résultat valide\n")
             continue
 
-        stats = compute_stats(results)
+        # ── Filtre de cohérence par type produit ──────────────────────────────
+        # Détermine le type cible depuis le nom de la recherche (ex: "ETB …" → 'etb',
+        # "Tripack …" → 'tripack'). Puis ne retient pour la médiane que les
+        # annonces du MÊME type — un tripack ne doit pas polluer la médiane ETB.
+        target_type, _ = _detect_product_type(_normalize(name))
+        if target_type:
+            before_type = len(results)
+            results_typed = [
+                r for r in results
+                if _detect_product_type(_normalize(r['title']))[0] == target_type
+            ]
+            removed_type = before_type - len(results_typed)
+            if removed_type:
+                print(f"  [Filtre] -{removed_type} mauvais type (cible: {target_type})")
+            # On garde le pool typé pour la médiane ; si trop petit, on revient au pool complet
+            results_for_median = results_typed if len(results_typed) >= 3 else results
+        else:
+            results_for_median = results
+
+        stats = compute_stats(results_for_median)
         if not stats:
             continue
 
         median = stats['median']
         update_stats(search_id, stats['avg'])
 
-        print(f"  📊 {stats['count']} annonces | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
+        print(f"  📊 {stats['count']} annonces ({target_type or '?'}) | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
 
         deals_found = 0
+        # On évalue les deals sur le pool complet filtré scellé, mais avec la médiane typée
         for res in sorted(results, key=lambda x: x['price']):
             ref = get_reference_price(res['title'], kw, median, stats['count'])
             ref_price = ref['reference_price']
