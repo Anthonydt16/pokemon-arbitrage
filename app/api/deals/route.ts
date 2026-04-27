@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 // ── Rate limiting in-memory ──────────────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; reset: number }>()
-function rateLimit(ip: string, max = 60, windowMs = 60_000): boolean {
+function rateLimit(ip: string, max = 200, windowMs = 60_000): boolean {
   const now = Date.now()
   const entry = rateLimitMap.get(ip) ?? { count: 0, reset: now + windowMs }
   if (now > entry.reset) { entry.count = 0; entry.reset = now + windowMs }
@@ -14,7 +14,7 @@ function rateLimit(ip: string, max = 60, windowMs = 60_000): boolean {
 
 export async function GET(req: Request) {
   const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
-  if (!rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') || undefined
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
-  if (!rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
   const body = await req.json()
   const { searchId, title, price, url, platform, imageUrl, cardMarketPrice, margin, location,
