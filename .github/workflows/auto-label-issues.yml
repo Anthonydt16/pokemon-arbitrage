@@ -23,18 +23,18 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             if (context.payload.action === 'closed' && pr.merged && base === 'dev') {{
-              // merged into dev -> remove 'in progress', add 'awaiting validation'
+              // merged into dev -> remove 'en cours', add 'en attente de validation'
               try {{
-                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'in progress' });
+                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'en cours' });
               }} catch (e) {{ core.info('could not remove label in progress: ' + e.message); }}
               try {{
-                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['awaiting validation'] });
+                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['en attente de validation'] });
               }} catch (e) {{ core.info('could not add awaiting validation: ' + e.message); }}
-              await github.rest.issues.createComment({ owner, repo, issue_number, body: `PR #${context.payload.pull_request.number} merged into dev. Issue marked awaiting validation.` });
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: `PR #${context.payload.pull_request.number} merged into dev. Issue marquée en attente de validation.` });
             }} else {{
-              // opened/sync/reopened -> add 'in progress'
+              // opened/sync/reopened -> add 'en cours'
               try {{
-                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['in progress'] });
+                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['en cours'] });
               }} catch (e) {{ core.info('could not add in progress: ' + e.message); }}
-              await github.rest.issues.createComment({ owner, repo, issue_number, body: `PR #${context.payload.pull_request.number} opened/updated. Issue marked in progress.` });
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: `PR #${context.payload.pull_request.number} opened/updated. Issue marquée en cours.` });
             }}
