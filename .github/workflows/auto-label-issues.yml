@@ -1,0 +1,40 @@
+name: Auto label PRs for dev branches
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  auto-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto label based on branch and PR state
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{{{ secrets.GITHUB_TOKEN }}}}
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {{ core.info('No PR in payload'); return; }}
+            const head = pr.head.ref;
+            const base = pr.base.ref;
+            const m = head.match(/^dev\/(\d+)-/);
+            if (!m) {{ core.info('Branch does not match dev/<num>-*, skipping'); return; }}
+            const issue_number = parseInt(m[1], 10);
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            if (context.payload.action === 'closed' && pr.merged && base === 'dev') {{
+              // merged into dev -> remove 'in progress', add 'awaiting validation'
+              try {{
+                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'in progress' });
+              }} catch (e) {{ core.info('could not remove label in progress: ' + e.message); }}
+              try {{
+                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['awaiting validation'] });
+              }} catch (e) {{ core.info('could not add awaiting validation: ' + e.message); }}
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: `PR #${context.payload.pull_request.number} merged into dev. Issue marked awaiting validation.` });
+            }} else {{
+              // opened/sync/reopened -> add 'in progress'
+              try {{
+                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['in progress'] });
+              }} catch (e) {{ core.info('could not add in progress: ' + e.message); }}
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: `PR #${context.payload.pull_request.number} opened/updated. Issue marked in progress.` });
+            }}
