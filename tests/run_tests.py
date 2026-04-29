@@ -19,7 +19,8 @@ def main():
     parser.add_argument('--all', action='store_true', help='Tous les tests')
     args = parser.parse_args()
 
-    from tests.test_scraper import TestFilters, TestPriceReference, TestAPI, TestScraperStructure
+    # Import test classes directly from the local module to avoid package import issues
+    from test_scraper import TestFilters, TestPriceReference, TestAPI, TestScraperStructure
 
     suite = unittest.TestSuite()
     loader = unittest.TestLoader()
