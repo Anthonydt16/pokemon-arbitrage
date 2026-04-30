@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Export or fallback
+        run: |
+          set -e
+          rm -rf out || true
+          echo "Trying next export..."
+          if npx next export -o out; then
+            echo "next export succeeded"
+          else
+            echo "next export failed, creating fallback static site"
+            mkdir -p out
+            cat > out/index.html <<'HTML'
+<!doctype html>
+<meta charset="utf-8">
+<title>Preview - pokemon-arbitrage</title>
+<style>body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0f1720;color:#e6eef8;padding:40px}</style>
+<h1 style="color:#ffd54a">pokemon-arbitrage — Preview unavailable</h1>
+<p>The Next.js App Router site cannot be exported as static HTML. For a live preview, deploy the app to a platform that supports Node serverless or server runtimes (Vercel / Render).</p>
+<p>Available API endpoints (relative to the app root):</p>
+<ul>
+  <li><code>/api/deals</code></li>
+  <li><code>/api/deals/top</code></li>
+  <li><code>/api/searches</code></li>
+  <li><code>/api/settings</code></li>
+</ul>
+<p>To get a dynamic preview please deploy to Vercel or grant CI a server capable of running the app.</p>
+HTML
+          fi
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          publish_branch: gh-pages
