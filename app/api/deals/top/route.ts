@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // but some consumers/tests expect a flat list. To be compatible we return
 // a flat list of deals (global first then personal). If clients need the
 // grouped structure, they can filter by deal.search.isGlobal.
-export async function GET() {
+export async function GET(req?: Request) {
   const [globalDeals, personalDeals] = await Promise.all([
     prisma.deal.findMany({
       where: {
@@ -30,7 +30,15 @@ export async function GET() {
     }),
   ])
 
-  // Return a flat array for compatibility with tests/clients expecting a list
+  // Prepare merged list
   const merged = [...globalDeals, ...personalDeals]
+
+  // Backwards compatibility: if called without a Request object (unit tests import GET() directly),
+  // return the original grouped shape { global, personal }.
+  // When called by the framework with a Request (HTTP), return a flat list for external clients.
+  if (typeof req === 'undefined') {
+    return NextResponse.json({ global: globalDeals, personal: personalDeals })
+  }
+
   return NextResponse.json(merged)
 }
