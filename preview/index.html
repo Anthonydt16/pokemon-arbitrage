@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PokéArbitrage — Preview</title>
+  <link rel="stylesheet" href="/preview/style.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="brand">🃏 <span>PokéArbitrage</span></div>
+    <button id="menuBtn" class="menuBtn">☰</button>
+    <nav id="nav" class="navLinks">
+      <a href="#">Dashboard</a>
+      <a href="#">Recherches</a>
+      <a href="#">Paramètres</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Les meilleures affaires cartes Pokémon — en temps réel</h1>
+      <p class="lead">Suivi, alertes et comparaisons de prix pour trouver les arbitrages.</p>
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <h3>Top 1 — ETB Flammes Obsidienne</h3>
+        <p class="price">Prix: 9.99€ · Vente: 19.99€</p>
+      </article>
+      <article class="card">
+        <h3>Top 2 — Tripack XYZ</h3>
+        <p class="price">Prix: 14.50€ · Vente: 29.99€</p>
+      </article>
+      <article class="card">
+        <h3>Top 3 — Booster ABC</h3>
+        <p class="price">Prix: 4.50€ · Vente: 12.00€</p>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const btn=document.getElementById('menuBtn')
+    const nav=document.getElementById('nav')
+    btn.addEventListener('click',()=>{nav.classList.toggle('open')})
+  </script>
+</body>
+</html>
