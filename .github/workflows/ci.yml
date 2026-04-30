@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ dev, main, "feat/*", "fix/*", "chore/*" ]
+  pull_request:
+    branches: [ dev ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+        python-version: [3.11]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install Node deps
+        working-directory: ./pokemon-arbitrage
+        run: |
+          npm ci
+
+      - name: Run frontend tests
+        working-directory: ./pokemon-arbitrage
+        run: |
+          if npm test --silent; then echo "Node tests passed"; else exit 1; fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Python deps
+        working-directory: ./pokemon-arbitrage
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scraper/requirements.txt || true
+
+      - name: Run Python tests
+        working-directory: ./pokemon-arbitrage
+        run: |
+          if pytest -q; then echo "Python tests passed"; else exit 1; fi
+
+      - name: Lint (ESLint)
+        working-directory: ./pokemon-arbitrage
+        run: |
+          if npm run lint --silent; then echo "Lint passed"; else echo "Lint failed"; fi
