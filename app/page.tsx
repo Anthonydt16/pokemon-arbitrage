@@ -13,7 +13,7 @@ type Deal = {
   location?: string
   status: string
   foundAt: string
-  search?: { name: string }
+  search?: { name: string; isGlobal?: boolean }
   trustLevel?: string
   trustFlags?: string
 }
