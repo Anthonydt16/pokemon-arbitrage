@@ -1,0 +1,22 @@
+:root{--bg:#030712;--fg:#ffffff;--muted:#9ca3af;--accent:#f59e0b}
+*{box-sizing:border-box}
+body{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial; margin:0;background:var(--bg);color:var(--fg);}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.brand{font-weight:700;font-size:18px;display:flex;gap:8px;align-items:center}
+.menuBtn{background:transparent;border:0;color:var(--fg);font-size:20px}
+.navLinks{display:none}
+.navLinks.open{display:flex}
+.navLinks a{margin-left:12px;color:var(--muted);text-decoration:none}
+.container{padding:16px}
+.hero h1{font-size:20px;margin:8px 0}
+.lead{color:var(--muted);margin-bottom:12px}
+.cards{display:grid;grid-template-columns:1fr;gap:12px}
+.card{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px}
+.price{color:var(--accent);font-weight:600}
+
+@media(min-width:640px){
+  .navLinks{display:flex}
+  .menuBtn{display:none}
+  .cards{grid-template-columns:repeat(3,1fr)}
+  .hero h1{font-size:28px}
+}
