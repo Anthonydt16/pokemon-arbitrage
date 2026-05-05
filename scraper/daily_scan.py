@@ -4,7 +4,10 @@ daily_scan.py — Scan quotidien à 12h sur le catalogue global Pokémon
 Avec : filtres qualité, score confiance, alertes Discord, résumé quotidien
 """
 
-import sqlite3, json, requests, schedule, time, os, sys, statistics
+import json, re, requests, schedule, time, os, sys, statistics
+import unicodedata
+import psycopg2
+import psycopg2.extras
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -15,9 +18,10 @@ from scrapers.ebay import scrape as scrape_ebay
 from filters import filter_results, is_sealed_product
 from notifier import send_deal_alert, send_daily_summary
 from price_reference import get_reference_price
-from trust_score import compute_trust, _detect_product_type, _normalize
+from trust_score import compute_trust
+from product_detector import detect_type, detect_extension
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
+DB_URL = os.environ.get('DATABASE_URL', 'postgresql://pokemon:pokemon@localhost:5432/pokemon')
 API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
 SCRAPER_API_KEY = os.environ.get('SCRAPER_API_KEY', 'scraper-internal-key-2026')
 SCRAPER_HEADERS = {'x-scraper-key': SCRAPER_API_KEY}
@@ -70,10 +74,9 @@ GLOBAL_CATALOG = [
 
 def get_or_create_search(name, keywords, platforms, min_p, max_p):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("SELECT id FROM Search WHERE name = ? AND isGlobal = 1", (name,))
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT id FROM "Search" WHERE name = %s AND "isGlobal" = true', (name,))
         row = cur.fetchone()
         conn.close()
         if row:
@@ -90,10 +93,10 @@ def get_or_create_search(name, keywords, platforms, min_p, max_p):
 
 def update_stats(search_id, avg):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
-        cur.execute("UPDATE Search SET lastAvgPrice=?, lastScrapeAt=? WHERE id=?",
-                    (avg, datetime.now(timezone.utc).isoformat(), search_id))
+        cur.execute('UPDATE "Search" SET "lastAvgPrice"=%s, "lastScrapeAt"=%s WHERE id=%s',
+                    (avg, datetime.now(timezone.utc), search_id))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -143,6 +146,52 @@ def compute_stats(results):
         'max': round(max(filtered), 2),
         'count': len(filtered),
     }
+
+
+def _types_match(target_type, detected_type):
+    """Type matching with a small compatibility window for booster/blister wording."""
+    if not target_type or not detected_type:
+        return False
+    if target_type == detected_type:
+        return True
+    if target_type == 'booster' and detected_type == 'blister':
+        return True
+    if target_type == 'blister' and detected_type == 'booster':
+        return True
+    return False
+
+
+def _normalize_text(value):
+    if not value:
+        return ''
+    nfkd = unicodedata.normalize('NFKD', value.lower())
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def _title_compatible_with_target(target_type, title):
+    if not target_type or not title:
+        return False
+    normalized = _normalize_text(title)
+
+    # Keep full displays only when the target is a display search.
+    if target_type == 'display':
+        if re.search(r'\bdemi[\s-]*display\b|\bhalf[\s-]*display\b', normalized):
+            return False
+
+        # Reject mixed product forms often mislabeled as display deals.
+        blocked = [
+            'etb',
+            'coffret',
+            'bundle',
+            'tripack',
+            'blister',
+            'upc',
+            '18 boosters',
+        ]
+        if any(token in normalized for token in blocked):
+            return False
+
+    return True
 
 
 def run_daily_scan():
@@ -206,24 +255,36 @@ def run_daily_scan():
             print("  → Aucun résultat valide\n")
             continue
 
-        # ── Filtre de cohérence par type produit ──────────────────────────────
-        # Détermine le type cible depuis le nom de la recherche (ex: "ETB …" → 'etb',
-        # "Tripack …" → 'tripack'). Puis ne retient pour la médiane que les
-        # annonces du MÊME type — un tripack ne doit pas polluer la médiane ETB.
-        target_type, _ = _detect_product_type(_normalize(name))
-        if target_type:
-            before_type = len(results)
-            results_typed = [
-                r for r in results
-                if _detect_product_type(_normalize(r['title']))[0] == target_type
-            ]
-            removed_type = before_type - len(results_typed)
-            if removed_type:
-                print(f"  [Filtre] -{removed_type} mauvais type (cible: {target_type})")
-            # On garde le pool typé pour la médiane ; si trop petit, on revient au pool complet
-            results_for_median = results_typed if len(results_typed) >= 3 else results
-        else:
-            results_for_median = results
+        # ── Filtre de cohérence strict type + extension ───────────────────────
+        # Objectif: éviter les faux labels (booster classé tripack, tripack classé display,
+        # mauvaise collection). On ne conserve que les annonces dont le type ET l'extension
+        # correspondent à la recherche globale en cours.
+        target_type = detect_type(name)
+        target_ext = detect_extension(name)
+
+        before_match = len(results)
+        strict_results = []
+        for r in results:
+            r_type = detect_type(r['title'])
+            r_ext = detect_extension(r['title'])
+            if not _types_match(target_type, r_type):
+                continue
+            if not _title_compatible_with_target(target_type, r['title']):
+                continue
+            if not target_ext or not r_ext or r_ext != target_ext:
+                continue
+            strict_results.append(r)
+
+        removed_match = before_match - len(strict_results)
+        if removed_match:
+            print(f"  [Filtre] -{removed_match} hors cible (type/ext). Cible: {target_type or '?'} / {target_ext or '?'}")
+
+        if not strict_results:
+            print("  → Aucun résultat fiable après filtre type/collection\n")
+            continue
+
+        # Pool unique et strict pour la médiane ET la sélection des deals
+        results_for_median = strict_results
 
         stats = compute_stats(results_for_median)
         if not stats:
@@ -232,11 +293,10 @@ def run_daily_scan():
         median = stats['median']
         update_stats(search_id, stats['avg'])
 
-        print(f"  📊 {stats['count']} annonces ({target_type or '?'}) | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
+        print(f"  📊 {stats['count']} annonces ({target_type or '?'} / {target_ext or '?'}) | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
 
         deals_found = 0
-        # On évalue les deals sur le pool complet filtré scellé, mais avec la médiane typée
-        for res in sorted(results, key=lambda x: x['price']):
+        for res in sorted(results_for_median, key=lambda x: x['price']):
             ref = get_reference_price(res['title'], kw, median, stats['count'])
             ref_price = ref['reference_price']
             margin = ((ref_price - res['price']) / ref_price) * 100
@@ -256,7 +316,7 @@ def run_daily_scan():
                 send_deal_alert(res, name, ref_price, margin, confidence, is_global=True)
 
         if not deals_found:
-            best = sorted(results, key=lambda x: x['price'])
+            best = sorted(results_for_median, key=lambda x: x['price'])
             if best:
                 b = best[0]
                 diff = (median - b['price']) / median * 100

@@ -4,8 +4,14 @@ import { getAuthUser } from '@/lib/auth'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const user = getAuthUser(_)
   const search = await prisma.search.findUnique({ where: { id } })
   if (!search) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  if (!search.isGlobal && (!user || search.userId !== user.userId)) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+
   return NextResponse.json({
     ...search,
     keywords: JSON.parse(search.keywords),

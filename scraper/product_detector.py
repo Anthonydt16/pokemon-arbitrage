@@ -27,8 +27,8 @@ EXTENSION_PATTERNS = [
     ('Mascarade Crépusculaire', r'ev6\.5|mascarade\s*cr[eé]pusculaire'),
     ('Forces Temporelles',      r'ev5\b|forces?\s*temporelles?'),
     ('Destinées de Paldea',     r'ev4\.5|destin[eé]es?\s*(?:de\s*)?paldea'),
-    ('Failles Paradoxales',     r'ev4\b(?!\.5)|failles?\s*paradoxales?'),
-    ('Pokémon 151',             r'ev3\.5|pok[eé]mon\s*151|(?<!\d)151(?!\d)'),
+    ('Failles Paradoxales',     r'ev4\b(?!\.5)|failles?\s*paradox(?:al(?:e|es)?|e(?:s)?)'),
+    ('Pokémon 151',             r'ev3\.5|pok[eé]mon\s*151'),
     ('Flammes Obsidiennes',     r'ev3\b(?!\.5)|flammes?\s*obsidiennes?'),
     ('Méga-Flamme ME02',        r'me02|me2\b|mega\s*flamme'),
     ('Méga-Évolution ME01',     r'me01|me1\b|mega\s*[eé]volution'),
@@ -54,7 +54,8 @@ TYPE_LABELS = {
 
 
 def _normalize(s: str) -> str:
-    return unicodedata.normalize('NFD', s.lower())
+    nfkd = unicodedata.normalize('NFKD', s.lower())
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
 
 
 def detect_type(title: str) -> str | None:

@@ -9,9 +9,9 @@ CREATE TABLE "Search" (
     "active" BOOLEAN NOT NULL DEFAULT true,
     "isGlobal" BOOLEAN NOT NULL DEFAULT false,
     "lastAvgPrice" REAL,
-    "lastScrapeAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "lastScrapeAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -27,7 +27,7 @@ CREATE TABLE "Deal" (
     "margin" REAL,
     "location" TEXT,
     "status" TEXT NOT NULL DEFAULT 'new',
-    "foundAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "foundAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "trustScore" INTEGER,
     "trustLevel" TEXT,
     "trustFlags" TEXT,
@@ -42,7 +42,7 @@ CREATE TABLE "Settings" (
     "discordWebhook" TEXT,
     "alertMinMargin" REAL NOT NULL DEFAULT 15,
     "alertGlobal" BOOLEAN NOT NULL DEFAULT true,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateIndex

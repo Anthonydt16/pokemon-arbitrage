@@ -11,7 +11,9 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:python": "python -m pytest tests/ -v",
-    "test:all": "npm run test && npm run test:python"
+    "test:all": "npm run test && npm run test:python",
+    "scrape:dev": "powershell -ExecutionPolicy Bypass -File scripts/run-scrape-dev.ps1",
+    "scrape:one-command": "powershell -ExecutionPolicy Bypass -File scripts/run-scrape.ps1"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

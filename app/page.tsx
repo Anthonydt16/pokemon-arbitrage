@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { authHeaders } from '@/lib/client-auth'
 
 type Deal = {
   id: string
@@ -143,14 +144,14 @@ export default function Dashboard() {
 
   const fetchBestToday = useCallback(async () => {
     try {
-      const res = await fetch('/api/deals/best-today')
+      const res = await fetch('/api/deals/best-today', { headers: authHeaders() })
       if (res.ok) setBestToday(await res.json())
     } catch {}
   }, [])
 
   const fetchTop = useCallback(async () => {
     try {
-      const res = await fetch('/api/deals/top')
+      const res = await fetch('/api/deals/top?limit=10', { headers: authHeaders() })
       if (res.ok) {
         const data = await res.json()
         setTopDeals({ global: data.global ?? [], personal: data.personal ?? [] })
@@ -165,7 +166,7 @@ export default function Dashboard() {
     params.set('page', String(p))
     params.set('limit', '20')
     try {
-      const res = await fetch(`/api/deals?${params}`)
+      const res = await fetch(`/api/deals?${params}`, { headers: authHeaders() })
       if (!res.ok) { setLoading(false); setLoadingMore(false); return }
       const data = await res.json()
       const newDeals: Deal[] = data.deals || []
@@ -192,10 +193,10 @@ export default function Dashboard() {
 
   const fetchSearchCount = useCallback(async () => {
     try {
-      const res = await fetch('/api/searches')
+      const res = await fetch('/api/searches', { headers: authHeaders() })
       if (!res.ok) return
       const data = await res.json()
-      setStats(prev => ({ ...prev, activeSearches: data.filter((s: { active: boolean }) => s.active).length }))
+      setStats(prev => ({ ...prev, activeSearches: data.filter((s: { active: boolean; isGlobal?: boolean }) => s.active && !s.isGlobal).length }))
     } catch {}
   }, [])
 
@@ -210,7 +211,11 @@ export default function Dashboard() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      await fetch(`/api/deals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      await fetch(`/api/deals/${id}`, {
+        method: 'PATCH',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ status }),
+      })
       setDeals(prev => prev.map(d => d.id === id ? { ...d, status } : d))
       fetchBestToday(); fetchTop()
     } catch {}
@@ -218,7 +223,7 @@ export default function Dashboard() {
 
   const deleteDeal = async (id: string) => {
     try {
-      await fetch(`/api/deals/${id}`, { method: 'DELETE' })
+      await fetch(`/api/deals/${id}`, { method: 'DELETE', headers: authHeaders() })
       setDeals(prev => prev.filter(d => d.id !== id))
       fetchBestToday(); fetchTop()
     } catch {}

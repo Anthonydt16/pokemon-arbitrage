@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth'
 
 // ── Rate limiting in-memory ──────────────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; reset: number }>()
@@ -12,9 +13,11 @@ function rateLimit(ip: string, max = 200, windowMs = 60_000): boolean {
   return entry.count <= max
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
   if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+
+  const user = getAuthUser(req)
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') || undefined
@@ -28,6 +31,9 @@ export async function GET(req: Request) {
     ...(status && { status }),
     ...(platform && { platform }),
     ...(searchId && { searchId }),
+    ...(user
+      ? { search: { OR: [{ isGlobal: true }, { userId: user.userId }] } }
+      : { search: { isGlobal: true } }),
   }
 
   const [deals, total] = await Promise.all([

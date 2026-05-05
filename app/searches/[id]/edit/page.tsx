@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import SearchForm, { SearchFormData } from '@/components/SearchForm'
+import { authHeaders, getToken } from '@/lib/client-auth'
 
 export default function EditSearchPage() {
   const router = useRouter()
@@ -10,9 +11,20 @@ export default function EditSearchPage() {
   const [initial, setInitial] = useState<SearchFormData | null>(null)
 
   useEffect(() => {
-    fetch(`/api/searches/${id}`)
-      .then(r => r.json())
-      .then(data => setInitial({
+    if (!getToken()) {
+      router.replace('/login')
+      return
+    }
+
+    fetch(`/api/searches/${id}`, { headers: authHeaders() })
+      .then(async r => {
+        if (r.status === 401 || r.status === 403) {
+          router.replace('/searches')
+          return null
+        }
+        return r.json()
+      })
+      .then(data => data && setInitial({
         name: data.name,
         keywords: data.keywords,
         platforms: data.platforms,
@@ -20,18 +32,22 @@ export default function EditSearchPage() {
         maxPrice: String(data.maxPrice),
         active: data.active,
       }))
-  }, [id])
+  }, [id, router])
 
   const handleSubmit = async (data: SearchFormData) => {
-    await fetch(`/api/searches/${id}`, {
+    const res = await fetch(`/api/searches/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         ...data,
         minPrice: parseFloat(data.minPrice),
         maxPrice: parseFloat(data.maxPrice),
       }),
     })
+    if (res.status === 401 || res.status === 403) {
+      router.push('/searches')
+      return
+    }
     router.push('/searches')
   }
 
