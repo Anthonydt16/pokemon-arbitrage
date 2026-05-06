@@ -188,7 +188,7 @@ def run_scraper():
                     src = '📊TCG' if ref['source'] == 'tcgplayer' else '📉méd'
                     emoji = '🔥' if margin >= 35 else '✅'
                     print(f"  {emoji} {item['price']}€ (-{margin:.0f}%) [{src}] — {item['title'][:50]} [{item['platform']}]")
-                    send_deal_alert(item, search['name'], ref_price, margin, confidence)
+                    send_deal_alert(item, search['name'], ref_price, margin, confidence, search_id=search['id'])
 
         if not deals_found:
             best = sorted(results, key=lambda x: x['price'])[:1]

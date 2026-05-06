@@ -8,11 +8,12 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // hashé bcrypt
-  createdAt DateTime @default(now())
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String    // hashé bcrypt
+  createdAt DateTime  @default(now())
   searches  Search[]
+  settings  Settings?
 }
 
 model Search {
@@ -55,9 +56,11 @@ model Deal {
 }
 
 model Settings {
-  id             String  @id @default("default")
-  discordWebhook String? // URL du webhook Discord
-  alertMinMargin Float   @default(15) // Seuil de marge minimum pour alerter
-  alertGlobal    Boolean @default(true)  // Alerter aussi pour le scan global
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discordWebhook String?
+  alertMinMargin Float    @default(15)
+  alertGlobal    Boolean  @default(true)
   updatedAt      DateTime @updatedAt
 }

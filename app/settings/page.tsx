@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { authHeaders } from '@/lib/client-auth'
 
 type Settings = {
   discordWebhook: string | null
@@ -16,10 +17,16 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(d => {
-      setSettings(d)
-      // Ne pré-remplit pas le champ (sécurité)
-    })
+    fetch('/api/settings', { headers: authHeaders() })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then(d => {
+        setSettings(d)
+        // Ne pré-remplit pas le champ (sécurité)
+      })
+      .catch(err => console.error('[settings load]', err))
   }, [])
 
   const showMsg = (type: 'ok' | 'error', text: string) => {
@@ -36,7 +43,7 @@ export default function SettingsPage() {
     if (webhookInput.trim()) body.discordWebhook = webhookInput.trim()
     const res = await fetch('/api/settings', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     })
     const data = await res.json()
@@ -49,7 +56,7 @@ export default function SettingsPage() {
     setWebhookInput('')
     // Si un nouveau webhook a été configuré, on le teste automatiquement
     if (webhookInput.trim() && data.discordWebhookSet) {
-      const testRes = await fetch('/api/settings', { method: 'POST' })
+      const testRes = await fetch('/api/settings', { method: 'POST', headers: authHeaders() })
       const testData = await testRes.json()
       if (testData.ok) showMsg('ok', 'Webhook configuré et testé avec succès ✅')
       else showMsg('error', `Webhook sauvegardé mais test échoué : ${testData.error}`)
@@ -61,7 +68,7 @@ export default function SettingsPage() {
 
   const testWebhook = async () => {
     setTesting(true)
-    const res = await fetch('/api/settings', { method: 'POST' })
+    const res = await fetch('/api/settings', { method: 'POST', headers: authHeaders() })
     const data = await res.json()
     if (data.ok) showMsg('ok', 'Message de test envoyé sur Discord ✅')
     else showMsg('error', data.error || 'Échec du test')
@@ -72,7 +79,7 @@ export default function SettingsPage() {
     if (!confirm('Supprimer le webhook Discord ?')) return
     await fetch('/api/settings', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ discordWebhook: '' }),
     })
     setSettings(prev => prev ? { ...prev, discordWebhookSet: false, discordWebhook: null } : prev)

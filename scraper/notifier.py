@@ -1,14 +1,16 @@
 """
 notifier.py — Alertes Discord via webhook
-Le webhook est lu depuis la DB (table Settings) à chaque appel.
-Pas de variable d'env nécessaire — tout se configure depuis l'UI.
+Les settings sont par utilisateur (table Settings liée à User).
+- Scan personnel  → alerte uniquement l'owner de la recherche
+- Scan global     → alerte tous les users avec alertGlobal=true
 """
 
-import sqlite3
 import os
 import requests
+import psycopg2
+import psycopg2.extras
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
+DB_URL = os.environ.get('DATABASE_URL', 'postgresql://pokemon:pokemon@localhost:5432/pokemon')
 
 PLATFORM_EMOJI = {
     'leboncoin': '🟠',
@@ -17,20 +19,51 @@ PLATFORM_EMOJI = {
 }
 
 
-def _get_settings() -> dict:
-    """Lit les paramètres depuis la DB."""
+def _get_settings_for_user(user_id: str) -> dict:
+    """Lit les paramètres d'un utilisateur précis."""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM Settings WHERE id = 'default'")
+        conn = psycopg2.connect(DB_URL)
+        conn.autocommit = True
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM "Settings" WHERE "userId" = %s', (user_id,))
         row = cur.fetchone()
         conn.close()
         if row:
             return dict(row)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  [Discord] Erreur lecture settings user {user_id}: {e}")
     return {'discordWebhook': None, 'alertMinMargin': 15, 'alertGlobal': True}
+
+
+def _get_all_settings_with_webhook() -> list:
+    """Retourne les settings de tous les users ayant un webhook configuré."""
+    try:
+        conn = psycopg2.connect(DB_URL)
+        conn.autocommit = True
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM "Settings" WHERE "discordWebhook" IS NOT NULL AND "discordWebhook" != \'\'')
+        rows = cur.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"  [Discord] Erreur lecture settings globaux: {e}")
+    return []
+
+
+def _get_search_owner(search_id: str) -> str | None:
+    """Retourne le userId propriétaire d'une recherche."""
+    try:
+        conn = psycopg2.connect(DB_URL)
+        conn.autocommit = True
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT "userId" FROM "Search" WHERE id = %s', (search_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return row['userId']
+    except Exception as e:
+        print(f"  [Discord] Erreur lecture owner search: {e}")
+    return None
 
 
 def _send(webhook_url: str, payload: dict) -> bool:
@@ -45,30 +78,7 @@ def _send(webhook_url: str, payload: dict) -> bool:
         return False
 
 
-def send_deal_alert(
-    deal: dict,
-    search_name: str,
-    avg_price: float,
-    margin: float,
-    confidence: float,
-    is_global: bool = False,
-):
-    """Envoie une alerte Discord pour un deal détecté."""
-    settings = _get_settings()
-    webhook_url = settings.get('discordWebhook')
-
-    if not webhook_url:
-        return  # Pas de webhook configuré
-
-    # Vérifie le seuil de marge
-    min_margin = settings.get('alertMinMargin', 15)
-    if margin < min_margin:
-        return
-
-    # Si deal global, vérifie que l'option est activée
-    if is_global and not settings.get('alertGlobal', True):
-        return
-
+def _build_embed(deal: dict, search_name: str, avg_price: float, margin: float, confidence: float) -> dict:
     emoji = '🔥' if margin >= 35 else '✅'
     platform = deal.get('platform', '')
     platform_emoji = PLATFORM_EMOJI.get(platform, '📦')
@@ -89,30 +99,67 @@ def send_deal_alert(
         "footer": {"text": "PokéArbitrage · Alerte personnalisée"},
         "timestamp": __import__('datetime').datetime.utcnow().isoformat() + 'Z',
     }
-
     if deal.get('imageUrl'):
         embed["thumbnail"] = {"url": deal['imageUrl']}
+    return embed
 
-    _send(webhook_url, {"embeds": [embed]})
+
+def send_deal_alert(
+    deal: dict,
+    search_name: str,
+    avg_price: float,
+    margin: float,
+    confidence: float,
+    is_global: bool = False,
+    search_id: str | None = None,
+):
+    """Envoie une alerte Discord pour un deal détecté.
+
+    - is_global=True  → envoie à tous les users avec alertGlobal=true
+    - is_global=False → envoie uniquement à l'owner de la recherche
+    """
+    embed = _build_embed(deal, search_name, avg_price, margin, confidence)
+
+    if is_global:
+        # Alerte tous les users qui ont un webhook ET alertGlobal activé
+        all_settings = _get_all_settings_with_webhook()
+        for s in all_settings:
+            if not s.get('alertGlobal', True):
+                continue
+            min_margin = s.get('alertMinMargin', 15)
+            if margin < min_margin:
+                continue
+            _send(s['discordWebhook'], {"embeds": [embed]})
+    else:
+        # Recherche personnelle → uniquement l'owner
+        user_id = search_id and _get_search_owner(search_id)
+        if not user_id:
+            return
+        settings = _get_settings_for_user(user_id)
+        webhook_url = settings.get('discordWebhook')
+        if not webhook_url:
+            return
+        min_margin = settings.get('alertMinMargin', 15)
+        if margin < min_margin:
+            return
+        _send(webhook_url, {"embeds": [embed]})
 
 
 def send_daily_summary(total_deals: int, items_scanned: int):
-    """Résumé du scan quotidien."""
-    settings = _get_settings()
-    webhook_url = settings.get('discordWebhook')
-
-    if not webhook_url or not settings.get('alertGlobal', True):
-        return
-
-    _send(webhook_url, {
-        "embeds": [{
-            "title": "🗓 Scan quotidien terminé",
-            "color": 0x5865F2,
-            "fields": [
-                {"name": "📦 Produits scannés", "value": str(items_scanned), "inline": True},
-                {"name": "🔥 Deals trouvés", "value": str(total_deals), "inline": True},
-            ],
-            "footer": {"text": "PokéArbitrage · Prochain scan à 12h00"},
-            "timestamp": __import__('datetime').datetime.utcnow().isoformat() + 'Z',
-        }]
-    })
+    """Résumé du scan quotidien — envoyé à tous les users avec alertGlobal=true."""
+    all_settings = _get_all_settings_with_webhook()
+    for s in all_settings:
+        if not s.get('alertGlobal', True):
+            continue
+        _send(s['discordWebhook'], {
+            "embeds": [{
+                "title": "🗓 Scan quotidien terminé",
+                "color": 0x5865F2,
+                "fields": [
+                    {"name": "📦 Produits scannés", "value": str(items_scanned), "inline": True},
+                    {"name": "🔥 Deals trouvés", "value": str(total_deals), "inline": True},
+                ],
+                "footer": {"text": "PokéArbitrage · Prochain scan à 12h00"},
+                "timestamp": __import__('datetime').datetime.utcnow().isoformat() + 'Z',
+            }]
+        })

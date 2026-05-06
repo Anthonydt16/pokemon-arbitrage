@@ -35,27 +35,29 @@ export default function Navbar() {
               <span>🃏</span>
               <span className="text-yellow-400">PokéArbitrage</span>
             </Link>
-            {/* Desktop links */}
-            <div className="hidden sm:flex gap-1">
-              {links.map(link => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === link.href
-                      ? 'bg-yellow-500 text-gray-900'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
+            {/* Desktop links — only for authenticated users */}
+            {email && (
+              <div className="hidden sm:flex gap-1">
+                {links.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === link.href
+                        ? 'bg-yellow-500 text-gray-900'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-xs text-gray-500">Scraper actif · toutes les 15min</div>
+            {email && <div className="hidden sm:block text-xs text-gray-500">Scraper actif · toutes les 15min</div>}
 
             {email ? (
               <>
@@ -93,7 +95,7 @@ export default function Navbar() {
         {open && (
           <div className="sm:hidden mt-2 mb-2">
             <div className="flex flex-col gap-1">
-              {links.map(link => (
+              {email && links.map(link => (
                 <Link
                   key={link.href}
                   href={link.href}
