@@ -119,6 +119,7 @@ def save_deal(search_id, deal, median, margin):
             'url': deal['url'], 'platform': deal['platform'],
             'imageUrl': deal.get('imageUrl'), 'cardMarketPrice': round(median, 2),
             'margin': round(margin, 1), 'location': deal.get('location'),
+            'publishedAt': deal.get('publishedAt'),
             'trustScore': deal.get('trustScore'),
             'trustLevel': deal.get('trustLevel'),
             'trustFlags': deal.get('trustFlags'),

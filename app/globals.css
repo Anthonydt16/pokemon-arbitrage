@@ -1,11 +1,39 @@
 @import "tailwindcss";
 
 :root {
-  --foreground-rgb: 255, 255, 255;
+  --foreground-rgb: 243, 244, 246;
   --background-rgb: 3, 7, 18;
 }
 
-/* Mobile-first baseline */
+/* ── Tailwind v4: remap gray scale for light mode ──
+   In Tailwind v4, every color utility (bg-gray-*, text-gray-*, border-gray-*)
+   resolves through CSS custom properties --color-gray-*. Overriding them on
+   .light automatically propagates to ALL usages without touching component code.
+   We essentially invert the scale: gray-950 (darkest bg) → near-white, etc.
+*/
+.light {
+  --foreground-rgb: 17, 24, 39;
+  --background-rgb: 249, 250, 251;
+  --color-gray-950: #f9fafb;
+  --color-gray-900: #f3f4f6;
+  --color-gray-800: #e5e7eb;
+  --color-gray-700: #d1d5db;
+  --color-gray-600: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-400: #4b5563;
+  --color-gray-300: #374151;
+  --color-gray-200: #1f2937;
+  --color-gray-100: #111827;
+  --color-white: #111827;
+}
+
+.light .hero-tagline-badge {
+  background-color: rgba(245, 158, 11, 0.16);
+  border-color: rgba(180, 83, 9, 0.45);
+  color: #92400e;
+}
+
+/* ── Base body ── */
 html, body, #__next {
   height: 100%;
 }
@@ -30,4 +58,68 @@ body {
 
 @media (min-width: 1024px) {
   .main-container { padding-left: 2rem; padding-right: 2rem; }
+}
+
+.snoop-range {
+  display: block;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 9999px;
+  background: transparent;
+  outline: none;
+  border: 0;
+  padding: 0;
+  accent-color: #facc15;
+}
+
+.snoop-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.snoop-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #facc15;
+  border: 2px solid #111827;
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.25);
+  margin-top: -7px;
+  cursor: pointer;
+}
+
+.snoop-range::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.snoop-range::-moz-range-progress {
+  height: 10px;
+  border-radius: 9999px;
+  background: #facc15;
+  border: 1px solid #374151;
+}
+
+.snoop-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #facc15;
+  border: 2px solid #111827;
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.25);
+  cursor: pointer;
+}
+
+.snoop-range:focus-visible {
+  outline: 2px solid #facc15;
+  outline-offset: 4px;
 }

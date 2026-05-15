@@ -13,6 +13,26 @@ function rateLimit(ip: string, max = 200, windowMs = 60_000): boolean {
   return entry.count <= max
 }
 
+function parsePublishedAt(value: unknown): Date | null {
+  if (!value) return null
+  try {
+    const dt = new Date(String(value))
+    if (Number.isNaN(dt.getTime())) return null
+
+    // Keep cleanup logic sane: only accept dates not older than 30 days and not in far future
+    const now = Date.now()
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000
+    const oneDay = 24 * 60 * 60 * 1000
+    const ts = dt.getTime()
+    if (ts < now - thirtyDays) return null
+    if (ts > now + oneDay) return null
+
+    return dt
+  } catch {
+    return null
+  }
+}
+
 export async function GET(req: NextRequest) {
   const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
   if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
@@ -62,7 +82,7 @@ export async function POST(req: Request) {
 
   const body = await req.json()
   const { searchId, title, price, url, platform, imageUrl, cardMarketPrice, margin, location,
-          trustScore, trustLevel, trustFlags, photoCount, isPro } = body
+      trustScore, trustLevel, trustFlags, photoCount, isPro, publishedAt } = body
 
   // Validation des champs obligatoires
   if (!searchId || !title || !url || !platform || price === undefined || isNaN(parseFloat(String(price)))) {
@@ -76,6 +96,8 @@ export async function POST(req: Request) {
   // Check duplicate
   const existing = await prisma.deal.findUnique({ where: { url } })
   if (existing) return NextResponse.json({ error: 'duplicate' }, { status: 409 })
+
+  const publishedAtDate = parsePublishedAt(publishedAt)
 
   const deal = await prisma.deal.create({
     data: {
@@ -93,6 +115,7 @@ export async function POST(req: Request) {
       trustFlags: trustFlags ?? null,
       photoCount: photoCount ?? null,
       isPro: isPro ?? null,
+      ...(publishedAtDate ? { foundAt: publishedAtDate } : {}),
     },
   })
   return NextResponse.json(deal)

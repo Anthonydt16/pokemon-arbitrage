@@ -1,10 +1,45 @@
 import requests
 import re
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 import urllib.parse
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from user_agents import get_headers
+
+
+def _parse_relative_datetime(text: str):
+    if not text:
+        return None
+    t = text.lower().strip()
+    now = datetime.now(timezone.utc)
+
+    if "aujourd" in t or 'today' in t:
+        return now.isoformat()
+    if 'hier' in t or 'yesterday' in t:
+        return (now - timedelta(days=1)).isoformat()
+
+    m = re.search(r'(\d+)\s*(h|heure|heures|hour|hours)', t)
+    if m:
+        return (now - timedelta(hours=int(m.group(1)))).isoformat()
+
+    m = re.search(r'(\d+)\s*(j|jour|jours|day|days)', t)
+    if m:
+        return (now - timedelta(days=int(m.group(1)))).isoformat()
+
+    return None
+
+
+def _extract_published_at(item):
+    # Try known listing date nodes first
+    date_node = item.select_one('.s-item__listingDate') or item.select_one('.s-item__time-left')
+    if date_node:
+        iso = _parse_relative_datetime(date_node.get_text(' ', strip=True))
+        if iso:
+            return iso
+
+    # Fallback to full card text
+    return _parse_relative_datetime(item.get_text(' ', strip=True))
 
 
 def scrape(keywords: list, min_price: float, max_price: float) -> list:
@@ -78,6 +113,7 @@ def scrape(keywords: list, min_price: float, max_price: float) -> list:
                     'location': None,
                     'isPro': is_pro,
                     'photoCount': photo_count,
+                    'publishedAt': _extract_published_at(item),
                 })
             except Exception:
                 continue

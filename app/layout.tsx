@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Nunito } from 'next/font/google'
+import { ThemeProvider } from '@/lib/theme'
 import './globals.css'
-import Navbar from '@/components/Navbar'
 
 const inter = Inter({ subsets: ['latin'] })
+const nunito = Nunito({ subsets: ['latin'], weight: ['800', '900'], variable: '--font-nunito' })
 
 export const metadata: Metadata = {
-  title: 'PokéArbitrage',
-  description: 'Détectez les bonnes affaires cartes Pokémon',
+  title: 'PokeSnoop',
+  description: 'Stop searching. Start snooping.',
 }
 
 export default function RootLayout({
@@ -16,13 +17,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="fr" className="dark">
-      <body className={`${inter.className} bg-gray-950 text-gray-100 min-h-screen`}>
-        <Navbar />
-        <main className="max-w-7xl mx-auto px-4 py-8">
+    <html className="dark" suppressHydrationWarning>
+      <body className={`${inter.className} ${nunito.variable} min-h-screen`}>
+        <ThemeProvider>
           {children}
-        </main>
+        </ThemeProvider>
       </body>
     </html>
   )
 }
+

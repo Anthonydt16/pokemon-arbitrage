@@ -1,11 +1,62 @@
 import requests
 import json
 import time
+from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 import urllib.parse
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from user_agents import get_headers
+
+
+def _to_iso_datetime(value):
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            # Leboncoin may provide seconds or milliseconds timestamps
+            ts = float(value)
+            if ts > 1e12:
+                ts = ts / 1000.0
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return None
+
+            # Numeric string timestamp
+            if raw.isdigit():
+                ts = float(raw)
+                if ts > 1e12:
+                    ts = ts / 1000.0
+                return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+            # ISO-like format
+            dt = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat()
+    except Exception:
+        return None
+    return None
+
+
+def _extract_published_at(ad: dict):
+    # Keys observed/likely in Leboncoin payloads
+    keys = [
+        'first_publication_date',
+        'index_date',
+        'publication_date',
+        'list_time',
+        'created_at',
+        'date',
+    ]
+    for key in keys:
+        iso = _to_iso_datetime(ad.get(key))
+        if iso:
+            return iso
+    return None
 
 
 def scrape(keywords: list, min_price: float, max_price: float, category: str = '', pages: int = 3) -> list:
@@ -66,6 +117,7 @@ def scrape(keywords: list, min_price: float, max_price: float, category: str = '
                     photo_count = len(img_urls) if img_urls else 0
 
                     if title and min_price <= price <= max_price:
+                        published_at = _extract_published_at(ad)
                         results.append({
                             'title': title[:200],
                             'price': price,
@@ -75,6 +127,7 @@ def scrape(keywords: list, min_price: float, max_price: float, category: str = '
                             'location': loc_str,
                             'isPro': is_pro,
                             'photoCount': photo_count,
+                            'publishedAt': published_at,
                         })
                 except Exception:
                     continue

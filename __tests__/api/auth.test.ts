@@ -84,11 +84,19 @@ describe('POST /api/auth/register', () => {
     mockPrisma.user.findUnique.mockResolvedValue(null)
     mockPrisma.user.create.mockResolvedValue(MOCK_USER)
 
-    await register(makeRegisterReq({ email: 'ash@pokemon.com', password: 'mypassword' }))
+    await register(makeRegisterReq({ email: 'ash@pokemon.com', password: 'mypassword1' }))
 
-    expect(mockBcrypt.hash).toHaveBeenCalledWith('mypassword', 12)
+    expect(mockBcrypt.hash).toHaveBeenCalledWith('mypassword1', 12)
     const createData = mockPrisma.user.create.mock.calls[0][0].data
-    expect(createData.password).toBe('hashed_mypassword')
+    expect(createData.password).toBe('hashed_mypassword1')
+  })
+
+  it('retourne 400 si le mot de passe ne respecte pas la règle', async () => {
+    const res = await register(makeRegisterReq({ email: 'ash@pokemon.com', password: 'abcdefg' }))
+    expect(res.status).toBe(400)
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled()
+    expect(mockPrisma.user.create).not.toHaveBeenCalled()
+    expect(mockBcrypt.hash).not.toHaveBeenCalled()
   })
 })
 

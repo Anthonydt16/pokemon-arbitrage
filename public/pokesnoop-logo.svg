@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 90" role="img" aria-label="PokeSnoop">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@900&amp;display=swap');
+      .logo-text { font-family: 'Nunito', 'Arial Rounded MT Bold', 'Trebuchet MS', Arial, sans-serif; font-weight: 900; }
+    </style>
+  </defs>
+
+  <!-- "Poke" in white -->
+  <text class="logo-text" x="4" y="74" font-size="78" fill="#FFFFFF" letter-spacing="-1">Poke</text>
+
+  <!-- "Snoop" in golden yellow -->
+  <text class="logo-text" x="209" y="74" font-size="78" fill="#FFBF00" letter-spacing="-1">Snoop</text>
+</svg>
