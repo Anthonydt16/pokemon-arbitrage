@@ -29,7 +29,7 @@ export default async function RootLayout({
   return (
     <I18nProvider locale={locale} messages={messages}>
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="main-container max-w-7xl mx-auto py-8 w-full">
         {children}
       </main>
     </I18nProvider>

@@ -266,7 +266,7 @@ export default function SearchesPage() {
                 {t('searches.noSearches')}
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {personalSearches.map(item => renderSearchCard(item, false))}
               </div>
             )}
@@ -282,7 +282,7 @@ export default function SearchesPage() {
                 {t('searches.noSearches')}
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {globalSearches.map(item => renderSearchCard(item, true))}
               </div>
             )}

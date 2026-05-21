@@ -43,14 +43,19 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status') || undefined
   const platform = searchParams.get('platform') || undefined
   const searchId = searchParams.get('searchId') || undefined
+  const sinceRaw = searchParams.get('since') || undefined
   const page = parseInt(searchParams.get('page') || '1')
   const limit = parseInt(searchParams.get('limit') || '50')
   const skip = (page - 1) * limit
+
+  const since = sinceRaw ? new Date(sinceRaw) : undefined
+  const sinceDate = since && !Number.isNaN(since.getTime()) ? since : undefined
 
   const where = {
     ...(status && { status }),
     ...(platform && { platform }),
     ...(searchId && { searchId }),
+    ...(sinceDate && { foundAt: { gte: sinceDate } }),
     ...(user
       ? { search: { OR: [{ isGlobal: true }, { userId: user.userId }] } }
       : { search: { isGlobal: true } }),

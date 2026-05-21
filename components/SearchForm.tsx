@@ -1,5 +1,6 @@
 'use client'
 import { useState, KeyboardEvent } from 'react'
+import { CheckIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 
 export type SearchFormData = {
@@ -179,7 +180,7 @@ export default function SearchForm({ initialData, onSubmit, submitLabel }: Props
                   : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-600'
               }`}
             >
-              {form.platforms.includes(p.id) ? '✓ ' : ''}{p.label}
+              {form.platforms.includes(p.id) ? <CheckIcon className="w-4 h-4 inline-block align-text-bottom mr-1" /> : null}{p.label}
             </button>
           ))}
         </div>
@@ -200,7 +201,7 @@ export default function SearchForm({ initialData, onSubmit, submitLabel }: Props
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
           </div>
-          <span className="text-gray-500">→</span>
+          <span className="text-gray-500"><ArrowRightIcon className="w-4 h-4 inline-block align-text-bottom" /></span>
           <div className="relative flex-1">
             <input
               type="number"
