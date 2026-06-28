@@ -43,9 +43,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r scraper/requirements.txt
+          pip install pytest
 
       - name: Run Python tests
-        run: pytest -q
+        run: python -m pytest tests/ -q
 
   deploy:
     name: Deploy via SSH and restart Docker
