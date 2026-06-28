@@ -86,8 +86,18 @@ jobs:
             set -e
             mkdir -p ~/pokesnoop
             cd ~/pokesnoop
+            if [ ! -d .git ]; then
+              if [ -z "$(ls -A . 2>/dev/null)" ]; then
+                git clone https://github.com/${{ github.repository }}.git .
+              else
+                echo "~/pokesnoop exists but is not a git repository."
+                echo "Either clean the directory or initialize git manually on the server."
+                exit 1
+              fi
+            fi
+            git remote set-url origin https://github.com/${{ github.repository }}.git
             git fetch --all
-            git checkout main
+            git checkout main || git checkout -b main origin/main
             git pull --ff-only origin main
             docker compose up -d --build
             docker compose ps
