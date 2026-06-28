@@ -52,10 +52,18 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     env:
-      IP: ${{ secrets.IP_VPS }}
-      LOGIN: ${{ secrets.LOGIN_VPS }}
+      IP:       ${{ secrets.IP_VPS }}
+      LOGIN:    ${{ secrets.LOGIN_VPS }}
+      SSH_PASS: ${{ secrets.PASSEWORD_VPS }}
 
     steps:
+      - name: Validate SSH secrets
+        run: |
+          if [ -z "$IP" ]; then echo "Missing secret: IP_VPS"; exit 1; fi
+          if [ -z "$LOGIN" ]; then echo "Missing secret: LOGIN_VPS"; exit 1; fi
+          if [ -z "$SSH_PASS" ]; then echo "Missing secret: PASSEWORD_VPS"; exit 1; fi
+          echo "SSH secrets OK"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -64,7 +72,7 @@ jobs:
         with:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
-          password: ${{ secrets.PASSEWORD_VPS }}
+          password: ${{ env.SSH_PASS }}
           port: 22
           script: |
             if ! command -v node &> /dev/null; then
@@ -101,7 +109,7 @@ jobs:
         with:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
-          password: ${{ secrets.PASSEWORD_VPS }}
+          password: ${{ env.SSH_PASS }}
           port: 22
           source: "deploy-package/*"
           target: "~/pokesnoop"
@@ -113,7 +121,7 @@ jobs:
         with:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
-          password: ${{ secrets.PASSEWORD_VPS }}
+          password: ${{ env.SSH_PASS }}
           port: 22
           script: |
             cd ~/pokesnoop
