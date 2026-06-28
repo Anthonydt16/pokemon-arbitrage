@@ -1,0 +1,38 @@
+name: Auto-merge PRs into dev when tests OK
+
+on:
+  pull_request:
+    types: [labeled, synchronize, opened, reopened]
+  check_suite:
+    types: [completed]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-merge when label present and checks green
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{{{ secrets.GITHUB_TOKEN }}}}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            let pr;
+            if (context.payload.pull_request) pr = context.payload.pull_request;
+            else if (context.payload.check_suite && context.payload.check_suite.pull_requests && context.payload.check_suite.pull_requests.length) pr = context.payload.check_suite.pull_requests[0];
+            if (!pr) {{ core.info('No associated PR found, exiting'); return; }}
+            if (pr.base.ref !== 'dev') {{ core.info('PR base not dev, skip'); return; }}
+            const prNumber = pr.number;
+            // get labels
+            const {data: labels} = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: prNumber });
+            const labelNames = labels.map(l=>l.name);
+            if (!labelNames.includes('tests-locaux-valides')) {{ core.info('Local tests label missing, skip merge'); return; }}
+            // check combined status for the head sha
+            const sha = pr.head.sha;
+            const {data: combined} = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha });
+            if (combined.state !== 'success') {{ core.info('Checks not all success, skip'); return; }}
+            // All good => merge with squash
+            try {{
+              await github.rest.pulls.merge({ owner, repo, pull_number: prNumber, merge_method: 'squash' });
+              await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: `PR #${context.payload.pull_request.number} merged into dev. Issue marked awaiting validation.` });
+            }} catch (e) {{ core.info('Merge failed: ' + e.message); }}

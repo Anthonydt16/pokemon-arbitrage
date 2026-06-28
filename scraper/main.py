@@ -4,7 +4,9 @@ main.py — Scraper des recherches utilisateur (toutes les 15 min)
 Avec : filtres qualité, score confiance, alertes Discord, rotation UA
 """
 
-import sqlite3, json, requests, schedule, time, os, sys, statistics
+import json, requests, schedule, time, os, sys, statistics
+import psycopg2
+import psycopg2.extras
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -18,17 +20,16 @@ from price_reference import get_reference_price
 from trust_score import compute_trust
 from product_detector import group_by_product
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
-API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
+DB_URL = os.environ.get('DATABASE_URL', 'postgresql://pokemon:pokemon@localhost:5432/pokemon')
+API_BASE = os.environ.get('API_BASE', 'http://localhost:3333/api')
 MIN_MARGIN = 15
 
 
 def get_active_searches():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM Search WHERE active = 1 AND (isGlobal = 0 OR isGlobal IS NULL)")
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM "Search" WHERE active = true AND ("isGlobal" = false OR "isGlobal" IS NULL)')
         rows = cur.fetchall()
         conn.close()
         searches = []
@@ -46,10 +47,10 @@ def get_active_searches():
 
 def update_stats(search_id, avg):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
-        cur.execute("UPDATE Search SET lastAvgPrice=?, lastScrapeAt=? WHERE id=?",
-                    (avg, datetime.now(timezone.utc).isoformat(), search_id))
+        cur.execute('UPDATE "Search" SET "lastAvgPrice"=%s, "lastScrapeAt"=%s WHERE id=%s',
+                    (avg, datetime.now(timezone.utc), search_id))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -72,6 +73,7 @@ def save_deal(search_id, deal, avg, margin):
             'url': deal['url'], 'platform': deal['platform'],
             'imageUrl': deal.get('imageUrl'), 'cardMarketPrice': round(avg, 2),
             'margin': round(margin, 1), 'location': deal.get('location'),
+            'publishedAt': deal.get('publishedAt'),
             'trustScore': deal.get('trustScore'),
             'trustLevel': deal.get('trustLevel'),
             'trustFlags': deal.get('trustFlags'),
@@ -187,7 +189,7 @@ def run_scraper():
                     src = '📊TCG' if ref['source'] == 'tcgplayer' else '📉méd'
                     emoji = '🔥' if margin >= 35 else '✅'
                     print(f"  {emoji} {item['price']}€ (-{margin:.0f}%) [{src}] — {item['title'][:50]} [{item['platform']}]")
-                    send_deal_alert(item, search['name'], ref_price, margin, confidence)
+                    send_deal_alert(item, search['name'], ref_price, margin, confidence, search_id=search['id'])
 
         if not deals_found:
             best = sorted(results, key=lambda x: x['price'])[:1]

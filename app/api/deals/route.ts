@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser } from '@/lib/auth'
 
 // ── Rate limiting in-memory ──────────────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; reset: number }>()
@@ -12,22 +13,52 @@ function rateLimit(ip: string, max = 200, windowMs = 60_000): boolean {
   return entry.count <= max
 }
 
-export async function GET(req: Request) {
+function parsePublishedAt(value: unknown): Date | null {
+  if (!value) return null
+  try {
+    const dt = new Date(String(value))
+    if (Number.isNaN(dt.getTime())) return null
+
+    // Keep cleanup logic sane: only accept dates not older than 30 days and not in far future
+    const now = Date.now()
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000
+    const oneDay = 24 * 60 * 60 * 1000
+    const ts = dt.getTime()
+    if (ts < now - thirtyDays) return null
+    if (ts > now + oneDay) return null
+
+    return dt
+  } catch {
+    return null
+  }
+}
+
+export async function GET(req: NextRequest) {
   const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
   if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+
+  const user = getAuthUser(req)
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') || undefined
   const platform = searchParams.get('platform') || undefined
   const searchId = searchParams.get('searchId') || undefined
+  const sinceRaw = searchParams.get('since') || undefined
   const page = parseInt(searchParams.get('page') || '1')
   const limit = parseInt(searchParams.get('limit') || '50')
   const skip = (page - 1) * limit
+
+  const since = sinceRaw ? new Date(sinceRaw) : undefined
+  const sinceDate = since && !Number.isNaN(since.getTime()) ? since : undefined
 
   const where = {
     ...(status && { status }),
     ...(platform && { platform }),
     ...(searchId && { searchId }),
+    ...(sinceDate && { foundAt: { gte: sinceDate } }),
+    ...(user
+      ? { search: { OR: [{ isGlobal: true }, { userId: user.userId }] } }
+      : { search: { isGlobal: true } }),
   }
 
   const [deals, total] = await Promise.all([
@@ -56,7 +87,7 @@ export async function POST(req: Request) {
 
   const body = await req.json()
   const { searchId, title, price, url, platform, imageUrl, cardMarketPrice, margin, location,
-          trustScore, trustLevel, trustFlags, photoCount, isPro } = body
+      trustScore, trustLevel, trustFlags, photoCount, isPro, publishedAt } = body
 
   // Validation des champs obligatoires
   if (!searchId || !title || !url || !platform || price === undefined || isNaN(parseFloat(String(price)))) {
@@ -70,6 +101,8 @@ export async function POST(req: Request) {
   // Check duplicate
   const existing = await prisma.deal.findUnique({ where: { url } })
   if (existing) return NextResponse.json({ error: 'duplicate' }, { status: 409 })
+
+  const publishedAtDate = parsePublishedAt(publishedAt)
 
   const deal = await prisma.deal.create({
     data: {
@@ -87,6 +120,7 @@ export async function POST(req: Request) {
       trustFlags: trustFlags ?? null,
       photoCount: photoCount ?? null,
       isPro: isPro ?? null,
+      ...(publishedAtDate ? { foundAt: publishedAtDate } : {}),
     },
   })
   return NextResponse.json(deal)

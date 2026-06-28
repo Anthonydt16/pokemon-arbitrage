@@ -3,6 +3,7 @@ trust_score.py — Calcule un score de confiance (0-100) pour chaque deal Pokém
 """
 
 import re
+import unicodedata
 
 KNOWN_EXTENSIONS = [
     'evolutions prismatiques', 'destinees paldea', 'pokemon 151',
@@ -12,19 +13,81 @@ KNOWN_EXTENSIONS = [
 ]
 
 PRICE_FLOORS = {
-    'etb': 35,
-    'coffret dresseur': 35,
     'display': 90,
-    'booster': 3,
-    'lot boosters': 15,
     'ultra premium': 60,
     'upc': 60,
+    'coffret': 15,
+    'tripack': 10,
+    'lot boosters': 15,
+    'etb': 35,
+    'coffret dresseur': 35,  # alias ETB — conservé pour compatibilité
+    'booster': 3,
 }
+
+# Ordre de détection du type produit : du plus spécifique au moins spécifique.
+# Règle clé : si le titre contient "booster" ET "etb", c'est un booster
+# (ex: "Booster Flammes Obsidienne ETB") — pas une ETB box.
+_BOOSTER_RE  = re.compile(r'\bbooster\b')
+_ETB_RE      = re.compile(r'\b(etb|elite\s*trainer|coffret\s*dresseur)\b')
+_TRIPACK_RE  = re.compile(r'\b(tripack|tri[\s-]pack|blister\s*3)\b')
+_COFFRET_RE  = re.compile(r'\b(coffret|collection\s*(?:premium|speciale))\b')
+
+
+def _detect_product_type(title_norm: str) -> tuple:
+    """
+    Détecte le type de produit dominant à partir du titre normalisé.
+    Retourne (product_type, price_floor) ou (None, None) si non reconnu.
+
+    Ordre de priorité (du plus spécifique au moins spécifique) :
+      display > ultra premium > coffret générique > tripack >
+      lot boosters > etb > booster
+
+    Correction bug #1 : "Booster X ETB" → booster, pas ETB.
+    Correction bug #2 : "Tripack X" → tripack, pas ETB ni booster.
+    """
+    has_etb     = bool(_ETB_RE.search(title_norm))
+    has_booster = bool(_BOOSTER_RE.search(title_norm))
+
+    # 1. Display / box complète → priorité absolue
+    if re.search(r'\b(display|36\s*boosters?|booster\s*box)\b', title_norm):
+        return 'display', PRICE_FLOORS['display']
+
+    # 2. Ultra Premium Collection
+    if re.search(r'\b(ultra\s*premium|upc)\b', title_norm):
+        return 'ultra premium', PRICE_FLOORS['ultra premium']
+
+    # 3. Coffret générique (cadeau, collection, sans être un ETB)
+    #    Ex: "Coffret Dracaufeu EX", "Collection Premium Pikachu"
+    #    Exclusion : "coffret dresseur" (ETB) est capturé plus bas via has_etb
+    if _COFFRET_RE.search(title_norm) and not has_etb:
+        return 'coffret', PRICE_FLOORS['coffret']
+
+    # 4. Tripack / blister 3 boosters
+    #    Priorité sur ETB et booster : "Tripack Flammes Obsidiennes" ≠ ETB
+    if _TRIPACK_RE.search(title_norm):
+        return 'tripack', PRICE_FLOORS['tripack']
+
+    # 5. Lot de boosters
+    if re.search(r'\blot\s*(de\s*)?\d*\s*(boosters?|bo[iî]tes?)\b', title_norm):
+        return 'lot boosters', PRICE_FLOORS['lot boosters']
+
+    # 6. ETB / Coffret Dresseur Élite
+    #    Bug #1 : si "booster" ET "etb" sont présents, le produit vendu
+    #    est un booster individuel issu d'un ETB → on le classe booster.
+    if has_etb and not has_booster:
+        return 'etb', PRICE_FLOORS['etb']
+    if has_etb and has_booster:
+        return 'booster', PRICE_FLOORS['booster']
+
+    # 7. Booster seul
+    if has_booster:
+        return 'booster', PRICE_FLOORS['booster']
+
+    return None, None
 
 
 def _normalize(text: str) -> str:
     """Lowercase + remove accents for fuzzy matching."""
-    import unicodedata
     nfkd = unicodedata.normalize('NFKD', text.lower())
     return ''.join(c for c in nfkd if not unicodedata.combining(c))
 
@@ -110,11 +173,9 @@ def compute_trust(item: dict, median: float, keywords: list) -> dict:
         score += 8  # particulier ou inconnu
 
     # ── Critère 5 — Prix plancher cohérent (10 pts) ──────────────────────────
-    detected_floor = None
-    for product_key, floor in PRICE_FLOORS.items():
-        if product_key in title_norm:
-            detected_floor = floor
-            break
+    # Utilise _detect_product_type pour éviter de classifier un booster comme ETB
+    # simplement parce que "ETB" apparaît dans son titre (bug #1).
+    _, detected_floor = _detect_product_type(title_norm)
 
     if detected_floor is not None:
         if price >= detected_floor:

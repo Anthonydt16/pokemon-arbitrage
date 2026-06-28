@@ -62,7 +62,7 @@ describe('PATCH /api/settings', () => {
   it('met à jour alertMinMargin et alertGlobal', async () => {
     mockPrisma.settings.upsert.mockResolvedValue({ ...MOCK_SETTINGS, alertMinMargin: 30, alertGlobal: false })
 
-    const req = new NextRequest('http://localhost:3001/api/settings', {
+    const req = new NextRequest('http://localhost:3333/api/settings', {
       method: 'PATCH',
       body: JSON.stringify({ alertMinMargin: 30, alertGlobal: false }),
       headers: { 'Content-Type': 'application/json' },
@@ -80,7 +80,7 @@ describe('PATCH /api/settings', () => {
       discordWebhook: 'https://discord.com/api/webhooks/123/token',
     })
 
-    const req = new NextRequest('http://localhost:3001/api/settings', {
+    const req = new NextRequest('http://localhost:3333/api/settings', {
       method: 'PATCH',
       body: JSON.stringify({ discordWebhook: 'https://discord.com/api/webhooks/123/token' }),
       headers: { 'Content-Type': 'application/json' },
@@ -90,7 +90,7 @@ describe('PATCH /api/settings', () => {
   })
 
   it('rejette une URL webhook non-Discord', async () => {
-    const req = new NextRequest('http://localhost:3001/api/settings', {
+    const req = new NextRequest('http://localhost:3333/api/settings', {
       method: 'PATCH',
       body: JSON.stringify({ discordWebhook: 'https://malicious.com/webhook' }),
       headers: { 'Content-Type': 'application/json' },
@@ -104,7 +104,7 @@ describe('PATCH /api/settings', () => {
       ...MOCK_SETTINGS,
       discordWebhook: 'https://discordapp.com/api/webhooks/123/token',
     })
-    const req = new NextRequest('http://localhost:3001/api/settings', {
+    const req = new NextRequest('http://localhost:3333/api/settings', {
       method: 'PATCH',
       body: JSON.stringify({ discordWebhook: 'https://discordapp.com/api/webhooks/123/token' }),
       headers: { 'Content-Type': 'application/json' },

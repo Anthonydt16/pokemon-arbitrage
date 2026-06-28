@@ -19,12 +19,12 @@ python main.py
 python scraper/main.py
 ```
 
-> ⚠️ L'app Next.js doit tourner sur le port 3001 avant de lancer le scraper.
+> ⚠️ L'app Next.js doit tourner sur le port 3333 avant de lancer le scraper.
 
 ## Configuration
 
 Variables d'environnement optionnelles :
-- `API_BASE` : URL de l'API (défaut: `http://localhost:3001/api`)
+- `API_BASE` : URL de l'API (défaut: `http://localhost:3333/api`)
 
 ## Comment ça marche
 

@@ -4,7 +4,10 @@ daily_scan.py — Scan quotidien à 12h sur le catalogue global Pokémon
 Avec : filtres qualité, score confiance, alertes Discord, résumé quotidien
 """
 
-import sqlite3, json, requests, schedule, time, os, sys, statistics
+import json, re, requests, schedule, time, os, sys, statistics
+import unicodedata
+import psycopg2
+import psycopg2.extras
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,50 +19,64 @@ from filters import filter_results, is_sealed_product
 from notifier import send_deal_alert, send_daily_summary
 from price_reference import get_reference_price
 from trust_score import compute_trust
-from product_detector import detect_product, group_by_product
+from product_detector import detect_type, detect_extension
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'prisma', 'dev.db')
-API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
+DB_URL = os.environ.get('DATABASE_URL', 'postgresql://pokemon:pokemon@localhost:5432/pokemon')
+API_BASE = os.environ.get('API_BASE', 'http://localhost:3333/api')
+SCRAPER_API_KEY = os.environ.get('SCRAPER_API_KEY', 'scraper-internal-key-2026')
+SCRAPER_HEADERS = {'x-scraper-key': SCRAPER_API_KEY}
 DEAL_THRESHOLD_PCT = 15
 
 GLOBAL_CATALOG = [
     # ── ETB (Elite Trainer Box) ──────────────────────────────
-    # keywords = termes de recherche | title_must_contain = au moins 1 doit être dans le titre
-    {'name': 'ETB Évolutions Prismatiques',   'keywords': ['etb evolutions prismatiques', 'ev8.5'],       'title_must_contain': ['evolutions prismatiques', 'ev8.5'],                      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 30,  'maxPrice': 220},
-    {'name': 'ETB Aventures Ensemble',          'keywords': ['etb aventures ensemble', 'ev9'],               'title_must_contain': ['aventures ensemble', 'ev9', 'ev09'],                     'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 25,  'maxPrice': 120},
-    {'name': 'ETB Equilibre Parfait',           'keywords': ['etb equilibre parfait', 'ev10'],               'title_must_contain': ['equilibre parfait', 'ev10'],                             'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 25,  'maxPrice': 130},
-    {'name': 'ETB Écarlate et Violet Base',     'keywords': ['etb ecarlate violet sv1'],                     'title_must_contain': ['ecarlate violet', 'sv1'],                                'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 15,  'maxPrice': 80},
-    {'name': 'ETB Destinées de Paldea',         'keywords': ['etb destinees paldea', 'ev4.5'],              'title_must_contain': ['destinees paldea', 'destinées paldea', 'ev4.5'],          'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20,  'maxPrice': 100},
-    {'name': 'ETB Mascarade Crépusculaire',     'keywords': ['etb mascarade crepusculaire', 'ev6.5'],       'title_must_contain': ['mascarade', 'ev6.5'],                                     'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 25,  'maxPrice': 130},
-    {'name': 'ETB Failles Paradoxales',         'keywords': ['etb failles paradoxales', 'ev4 pokemon'],     'title_must_contain': ['failles paradoxales', 'ev4'],                            'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20,  'maxPrice': 100},
-    {'name': 'ETB Couronne Stellaire',          'keywords': ['etb couronne stellaire', 'ev7 pokemon'],      'title_must_contain': ['couronne stellaire', 'ev7'],                              'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 25,  'maxPrice': 120},
-    {'name': 'ETB Forces Temporelles',          'keywords': ['etb forces temporelles', 'ev5 pokemon'],      'title_must_contain': ['forces temporelles', 'ev5'],                             'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20,  'maxPrice': 100},
-    {'name': 'ETB Flammes Obsidiennes',         'keywords': ['etb flammes obsidiennes', 'ev3 pokemon'],     'title_must_contain': ['flammes obsidiennes', 'ev3'],                            'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20,  'maxPrice': 100},
-    {'name': 'ETB Pokémon 151',                 'keywords': ['etb pokemon 151', 'ev3.5 pokemon'],           'title_must_contain': ['pokemon 151', '151', 'ev3.5'],                           'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 30,  'maxPrice': 150},
-    {'name': 'ETB Méga-Évolution ME01',         'keywords': ['etb mega evolution me01 pokemon'],             'title_must_contain': ['mega evolution', 'me01', 'me1'],                          'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 40,  'maxPrice': 200},
-    {'name': 'ETB Méga-Flamme ME02',             'keywords': ['etb mega flamme me02 pokemon'],                'title_must_contain': ['mega flamme', 'me02', 'me2'],                             'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 35,  'maxPrice': 180},
-    # ── Display (36 boosters) ────────────────────────
-    {'name': 'Display Évolutions Prismatiques',  'keywords': ['display evolutions prismatiques ev8.5'],      'title_must_contain': ['evolutions prismatiques', 'ev8.5'],                      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 100, 'maxPrice': 500},
-    {'name': 'Display Destinées de Paldea',      'keywords': ['display destinees paldea ev4.5'],             'title_must_contain': ['destinees paldea', 'destinées paldea', 'ev4.5'],          'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60,  'maxPrice': 300},
-    {'name': 'Display Pokémon 151',              'keywords': ['display pokemon 151 ev3.5'],                   'title_must_contain': ['pokemon 151', '151', 'ev3.5'],                           'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 80,  'maxPrice': 400},
-    {'name': 'Display Couronne Stellaire',      'keywords': ['display couronne stellaire ev7'],             'title_must_contain': ['couronne stellaire', 'ev7'],                              'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60,  'maxPrice': 250},
-    {'name': 'Display Failles Paradoxales',     'keywords': ['display failles paradoxales ev4'],            'title_must_contain': ['failles paradoxales', 'ev4'],                            'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60,  'maxPrice': 250},
-    {'name': 'Display Forces Temporelles',      'keywords': ['display forces temporelles ev5'],             'title_must_contain': ['forces temporelles', 'ev5'],                             'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60,  'maxPrice': 250},
-    # ── Coffrets Premium ─────────────────────────────────
-    {'name': 'Coffret Ultra Premium Dracaufeu', 'keywords': ['ultra premium collection dracaufeu upc'],     'title_must_contain': ['ultra premium', 'upc'],                                  'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 80,  'maxPrice': 400},
-    {'name': 'Coffret Ultra Premium Pikachu',   'keywords': ['ultra premium collection pikachu upc'],       'title_must_contain': ['ultra premium', 'upc'],                                  'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60,  'maxPrice': 300},
-    {'name': 'Coffret Ultra Premium Mewtwo',    'keywords': ['ultra premium collection mewtwo upc'],        'title_must_contain': ['ultra premium', 'upc'],                                  'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60,  'maxPrice': 300},
-    {'name': 'Booster Évolutions Prismatiques',  'keywords': ['booster evolutions prismatiques ev8.5'],      'title_must_contain': ['evolutions prismatiques', 'ev8.5'],                      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 4,   'maxPrice': 30},
-    {'name': 'Lot boosters scellés',             'keywords': ['lot boosters pokemon scelle neuf'],            'title_must_contain': ['lot', 'boosters'],                                        'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10,  'maxPrice': 200},
+    {'name': 'ETB Évolutions Prismatiques', 'keywords': ['etb evolutions prismatiques', 'coffret dresseur elite ev8.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 30, 'maxPrice': 220},
+    {'name': 'ETB Écarlate et Violet Base', 'keywords': ['etb ecarlate violet base', 'coffret dresseur elite sv1'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 15, 'maxPrice': 80},
+    {'name': 'ETB Destinées de Paldea', 'keywords': ['etb destinees paldea', 'coffret dresseur ev4.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 100},
+    {'name': 'ETB Mascarade Crépusculaire', 'keywords': ['etb mascarade crepusculaire', 'coffret dresseur ev6.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 25, 'maxPrice': 130},
+    {'name': 'ETB Failles Paradoxales', 'keywords': ['etb failles paradoxales', 'coffret dresseur ev4'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 100},
+    {'name': 'ETB Couronne Stellaire', 'keywords': ['etb couronne stellaire', 'coffret dresseur ev7'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 25, 'maxPrice': 120},
+    {'name': 'ETB Forces Temporelles', 'keywords': ['etb forces temporelles', 'coffret dresseur ev5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 100},
+    {'name': 'ETB Flammes Obsidiennes', 'keywords': ['etb flammes obsidiennes', 'coffret dresseur ev3'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 100},
+    {'name': 'ETB Pokémon 151', 'keywords': ['etb pokemon 151', 'coffret dresseur ev3.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 30, 'maxPrice': 150},
+    {'name': 'ETB Évolutions à Paldea', 'keywords': ['etb evolutions paldea', 'coffret dresseur sv2'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 90},
+    # ── Display (36 boosters) ────────────────────────────────
+    {'name': 'Display Évolutions Prismatiques', 'keywords': ['display evolutions prismatiques', '36 boosters ev8.5 pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 100, 'maxPrice': 500},
+    {'name': 'Display Destinées de Paldea', 'keywords': ['display destinees paldea', '36 boosters ev4.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60, 'maxPrice': 300},
+    {'name': 'Display Pokémon 151', 'keywords': ['display pokemon 151', '36 boosters ev3.5 151'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 80, 'maxPrice': 400},
+    {'name': 'Display Couronne Stellaire', 'keywords': ['display couronne stellaire', '36 boosters ev7 pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60, 'maxPrice': 250},
+    {'name': 'Display Failles Paradoxales', 'keywords': ['display failles paradoxales', '36 boosters ev4 pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60, 'maxPrice': 250},
+    {'name': 'Display Forces Temporelles', 'keywords': ['display forces temporelles', '36 boosters ev5 pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60, 'maxPrice': 250},
+    # ── Coffrets Premium ─────────────────────────────────────
+    {'name': 'Coffret Ultra Premium Dracaufeu', 'keywords': ['ultra premium collection dracaufeu', 'upc charizard pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 80, 'maxPrice': 400},
+    {'name': 'Coffret Ultra Premium Pikachu', 'keywords': ['ultra premium collection pikachu', 'upc pikachu pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60, 'maxPrice': 300},
+    {'name': 'Coffret Ultra Premium Mewtwo', 'keywords': ['ultra premium collection mewtwo', 'upc mewtwo pokemon'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 60, 'maxPrice': 300},
+    {'name': 'Coffret Dracaufeu EX', 'keywords': ['coffret dracaufeu ex pokemon scelle'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 15, 'maxPrice': 80},
+    {'name': 'Coffret Pokémon 151 Collection', 'keywords': ['coffret collection pokemon 151 scelle'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 150},
+    # ── Boosters à l'unité & petits lots ─────────────────────
+    {'name': 'Booster Évolutions Prismatiques', 'keywords': ['booster evolutions prismatiques', 'booster ev8.5 pokemon scelle'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 4, 'maxPrice': 30},
+    {'name': 'Lot boosters scellés Pokémon', 'keywords': ['lot boosters pokemon scelle neuf'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10, 'maxPrice': 200},
+    # ── Tripack (blister 3 boosters) ─────────────────────────
+    {'name': 'Tripack Flammes Obsidiennes',       'keywords': ['tripack flammes obsidiennes', 'blister 3 boosters ev3'],     'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 40},
+    {'name': 'Tripack Évolutions Prismatiques',   'keywords': ['tripack evolutions prismatiques', 'blister 3 boosters ev8.5'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10, 'maxPrice': 50},
+    {'name': 'Tripack Pokémon 151',               'keywords': ['tripack pokemon 151', 'blister 3 boosters ev3.5'],            'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 10, 'maxPrice': 50},
+    {'name': 'Tripack Destinées de Paldea',       'keywords': ['tripack destinees paldea', 'blister 3 boosters ev4.5'],      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 35},
+    {'name': 'Tripack Couronne Stellaire',        'keywords': ['tripack couronne stellaire', 'blister 3 boosters ev7'],      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 35},
+    {'name': 'Tripack Forces Temporelles',        'keywords': ['tripack forces temporelles', 'blister 3 boosters ev5'],      'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 8,  'maxPrice': 35},
+    # ── Cartes rares singles — EXCLUS du scan global (faussent la médiane) ──
+    # Singles à gérer dans les recherches personnalisées uniquement
+    # {'name': 'Dracaufeu carte rare', ...}
+    # {'name': 'Pikachu VMAX carte', ...}
+    # {'name': 'Lugia V Alt Art', ...}
+    # ── Vintage lots scellés uniquement ──────────────────────
+    {'name': 'Lot Pokémon vintage scellé', 'keywords': ['lot pokemon vintage booster ancien scelle'], 'platforms': ['leboncoin', 'vinted', 'ebay'], 'minPrice': 20, 'maxPrice': 500},
 ]
 
 
 def get_or_create_search(name, keywords, platforms, min_p, max_p):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("SELECT id FROM Search WHERE name = ? AND isGlobal = 1", (name,))
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT id FROM "Search" WHERE name = %s AND "isGlobal" = true', (name,))
         row = cur.fetchone()
         conn.close()
         if row:
@@ -67,7 +84,7 @@ def get_or_create_search(name, keywords, platforms, min_p, max_p):
         r = requests.post(f"{API_BASE}/searches", json={
             'name': name, 'keywords': keywords, 'platforms': platforms,
             'minPrice': min_p, 'maxPrice': max_p, 'active': True, 'isGlobal': True,
-        }, timeout=10)
+        }, headers=SCRAPER_HEADERS, timeout=10)
         return r.json()['id'] if r.status_code == 200 else None
     except Exception as e:
         print(f"  [DB] get_or_create: {e}")
@@ -76,10 +93,10 @@ def get_or_create_search(name, keywords, platforms, min_p, max_p):
 
 def update_stats(search_id, avg):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
-        cur.execute("UPDATE Search SET lastAvgPrice=?, lastScrapeAt=? WHERE id=?",
-                    (avg, datetime.now(timezone.utc).isoformat(), search_id))
+        cur.execute('UPDATE "Search" SET "lastAvgPrice"=%s, "lastScrapeAt"=%s WHERE id=%s',
+                    (avg, datetime.now(timezone.utc), search_id))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -102,6 +119,7 @@ def save_deal(search_id, deal, median, margin):
             'url': deal['url'], 'platform': deal['platform'],
             'imageUrl': deal.get('imageUrl'), 'cardMarketPrice': round(median, 2),
             'margin': round(margin, 1), 'location': deal.get('location'),
+            'publishedAt': deal.get('publishedAt'),
             'trustScore': deal.get('trustScore'),
             'trustLevel': deal.get('trustLevel'),
             'trustFlags': deal.get('trustFlags'),
@@ -129,6 +147,52 @@ def compute_stats(results):
         'max': round(max(filtered), 2),
         'count': len(filtered),
     }
+
+
+def _types_match(target_type, detected_type):
+    """Type matching with a small compatibility window for booster/blister wording."""
+    if not target_type or not detected_type:
+        return False
+    if target_type == detected_type:
+        return True
+    if target_type == 'booster' and detected_type == 'blister':
+        return True
+    if target_type == 'blister' and detected_type == 'booster':
+        return True
+    return False
+
+
+def _normalize_text(value):
+    if not value:
+        return ''
+    nfkd = unicodedata.normalize('NFKD', value.lower())
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def _title_compatible_with_target(target_type, title):
+    if not target_type or not title:
+        return False
+    normalized = _normalize_text(title)
+
+    # Keep full displays only when the target is a display search.
+    if target_type == 'display':
+        if re.search(r'\bdemi[\s-]*display\b|\bhalf[\s-]*display\b', normalized):
+            return False
+
+        # Reject mixed product forms often mislabeled as display deals.
+        blocked = [
+            'etb',
+            'coffret',
+            'bundle',
+            'tripack',
+            'blister',
+            'upc',
+            '18 boosters',
+        ]
+        if any(token in normalized for token in blocked):
+            return False
+
+    return True
 
 
 def run_daily_scan():
@@ -188,59 +252,76 @@ def run_daily_scan():
         if removed_sealed:
             print(f"  [Filtre] -{removed_sealed} non-scellés (cartes singles, accessoires…)")
 
-        # Filtre titre strict — l'annonce doit correspondre AU produit cherché
-        must_contain = item.get('title_must_contain', [])
-        if must_contain:
-            before_strict = len(results)
-            results = [r for r in results if any(m in r['title'].lower() for m in must_contain)]
-            removed_strict = before_strict - len(results)
-            if removed_strict:
-                print(f"  [Filtre] -{removed_strict} mauvais produit (ex: autre ETB)")
-
         if not results:
             print("  → Aucun résultat valide\n")
             continue
 
-        # Groupe par produit détecté pour médiane per-produit
-        groups = group_by_product(results)
-        detected = [k for k in groups if k != 'unknown']
-        print(f"  📦 {len(groups)} produit(s) détecté(s) : {', '.join(detected) if detected else 'aucun'}")
+        # ── Filtre de cohérence strict type + extension ───────────────────────
+        # Objectif: éviter les faux labels (booster classé tripack, tripack classé display,
+        # mauvaise collection). On ne conserve que les annonces dont le type ET l'extension
+        # correspondent à la recherche globale en cours.
+        target_type = detect_type(name)
+        target_ext = detect_extension(name)
+
+        before_match = len(results)
+        strict_results = []
+        for r in results:
+            r_type = detect_type(r['title'])
+            r_ext = detect_extension(r['title'])
+            if not _types_match(target_type, r_type):
+                continue
+            if not _title_compatible_with_target(target_type, r['title']):
+                continue
+            if not target_ext or not r_ext or r_ext != target_ext:
+                continue
+            strict_results.append(r)
+
+        removed_match = before_match - len(strict_results)
+        if removed_match:
+            print(f"  [Filtre] -{removed_match} hors cible (type/ext). Cible: {target_type or '?'} / {target_ext or '?'}")
+
+        if not strict_results:
+            print("  → Aucun résultat fiable après filtre type/collection\n")
+            continue
+
+        # Pool unique et strict pour la médiane ET la sélection des deals
+        results_for_median = strict_results
+
+        stats = compute_stats(results_for_median)
+        if not stats:
+            continue
+
+        median = stats['median']
+        update_stats(search_id, stats['avg'])
+
+        print(f"  📊 {stats['count']} annonces ({target_type or '?'} / {target_ext or '?'}) | moy {stats['avg']}€ | méd {median}€ | confiance {confidence:.0%}")
 
         deals_found = 0
-        for product_name, product_items in groups.items():
-            if product_name == 'unknown':
-                continue  # Skip les non-identifiés
-
-            stats = compute_stats(product_items)
-            if not stats or stats['count'] < 3:
-                continue  # Pas assez d'annonces pour une médiane fiable
-
-            median = stats['median']
-            update_stats(search_id, stats['avg'])
-            print(f"  📊 [{product_name}] {stats['count']} annonces | méd {median}€")
-
-            for res in sorted(product_items, key=lambda x: x['price']):
-                ref = get_reference_price(res['title'], kw, median, stats['count'])
-                ref_price = ref['reference_price']
-                margin = ((ref_price - res['price']) / ref_price) * 100
-                if margin < DEAL_THRESHOLD_PCT:
-                    continue
-                trust = compute_trust(res, median, kw)
-                res['trustScore'] = trust['score']
-                res['trustLevel'] = trust['level']
-                res['trustFlags'] = json.dumps(trust['flags'], ensure_ascii=False)
-                if save_deal_with_retry(search_id, res, ref_price, margin):
-                    deals_found += 1
-                    total_deals += 1
-                    emoji = '🔥' if margin >= 35 else '✅'
-                    print(f"    {emoji} {res['price']}€ (-{margin:.0f}%) — {res['title'][:55]} [{res['platform']}]")
-                    send_deal_alert(res, product_name, ref_price, margin, 1.0, is_global=True)
+        for res in sorted(results_for_median, key=lambda x: x['price']):
+            ref = get_reference_price(res['title'], kw, median, stats['count'])
+            ref_price = ref['reference_price']
+            margin = ((ref_price - res['price']) / ref_price) * 100
+            if margin < DEAL_THRESHOLD_PCT:
+                continue
+            # Trust score
+            trust = compute_trust(res, median, kw)
+            res['trustScore'] = trust['score']
+            res['trustLevel'] = trust['level']
+            res['trustFlags'] = json.dumps(trust['flags'], ensure_ascii=False)
+            if save_deal_with_retry(search_id, res, ref_price, margin):
+                deals_found += 1
+                total_deals += 1
+                src = '📊TCG' if ref['source'] == 'tcgplayer' else '📉méd'
+                emoji = '🔥' if margin >= 35 else '✅'
+                print(f"  {emoji} {res['price']}€ (-{margin:.0f}%) [{src}] — {res['title'][:55]} [{res['platform']}]")
+                send_deal_alert(res, name, ref_price, margin, confidence, is_global=True)
 
         if not deals_found:
-            best = sorted(results, key=lambda x: x['price'])
+            best = sorted(results_for_median, key=lambda x: x['price'])
             if best:
                 b = best[0]
-                print(f"  → Meilleur prix: {b['price']}€ — {b['title'][:55]}")
+                diff = (median - b['price']) / median * 100
+                print(f"  → Meilleur prix: {b['price']}€ ({diff:+.0f}% vs méd)")
         print()
 
     print(f"{'='*60}")

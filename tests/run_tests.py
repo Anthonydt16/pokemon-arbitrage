@@ -13,13 +13,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scraper'))
 
 def main():
     parser = argparse.ArgumentParser(description='PokéArbitrage Test Runner')
-    parser.add_argument('--api', action='store_true', help='Tests API uniquement (app :3001 requise)')
+    parser.add_argument('--api', action='store_true', help='Tests API uniquement (app :3333 requise)')
     parser.add_argument('--scraper', action='store_true', help='Tests scraper structure uniquement')
     parser.add_argument('--filters', action='store_true', help='Tests filtres uniquement')
     parser.add_argument('--all', action='store_true', help='Tous les tests')
     args = parser.parse_args()
 
-    from tests.test_scraper import TestFilters, TestPriceReference, TestAPI, TestScraperStructure
+    # Import test classes directly from the local module to avoid package import issues
+    from test_scraper import TestFilters, TestPriceReference, TestAPI, TestScraperStructure
 
     suite = unittest.TestSuite()
     loader = unittest.TestLoader()

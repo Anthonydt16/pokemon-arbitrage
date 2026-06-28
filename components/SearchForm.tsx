@@ -1,5 +1,6 @@
 'use client'
 import { useState, KeyboardEvent } from 'react'
+import { CheckIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 
 export type SearchFormData = {
@@ -37,12 +38,38 @@ export default function SearchForm({ initialData, onSubmit, submitLabel }: Props
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const normalizeKeyword = (value: string) => value.trim().toLowerCase()
+
+  const appendKeywords = (values: string[]) => {
+    const normalized = values.map(normalizeKeyword).filter(Boolean)
+    if (normalized.length === 0) return
+
+    setForm(prev => {
+      const merged = [...prev.keywords]
+      for (const kw of normalized) {
+        if (!merged.includes(kw)) merged.push(kw)
+      }
+      return { ...prev, keywords: merged }
+    })
+  }
+
   const addKeyword = () => {
-    const val = keywordInput.trim().toLowerCase()
-    if (val && !form.keywords.includes(val)) {
-      setForm(prev => ({ ...prev, keywords: [...prev.keywords, val] }))
-    }
+    appendKeywords([keywordInput])
     setKeywordInput('')
+  }
+
+  const onKeywordChange = (value: string) => {
+    if (!value.includes(',')) {
+      setKeywordInput(value)
+      return
+    }
+
+    const parts = value.split(',')
+    const completed = parts.slice(0, -1)
+    const draft = parts[parts.length - 1] || ''
+
+    appendKeywords(completed)
+    setKeywordInput(draft.trimStart())
   }
 
   const onKeywordKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -105,26 +132,37 @@ export default function SearchForm({ initialData, onSubmit, submitLabel }: Props
       {/* Mots-clés */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Mots-clés <span className="text-gray-500 font-normal">(Entrée pour valider)</span>
+          Mots-clés <span className="text-gray-500 font-normal">(virgule ou Entrée pour valider)</span>
         </label>
-        <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 flex flex-wrap gap-2 focus-within:border-yellow-500 transition-colors min-h-[44px]">
-          {form.keywords.map(kw => (
-            <span key={kw} className="inline-flex items-center gap-1 bg-yellow-500/20 text-yellow-400 text-sm px-2 py-0.5 rounded-full">
-              {kw}
-              <button type="button" onClick={() => removeKeyword(kw)} className="hover:text-yellow-200 leading-none">×</button>
-            </span>
-          ))}
+        <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus-within:border-yellow-500 transition-colors min-h-[44px]">
           <input
             type="text"
             value={keywordInput}
-            onChange={e => setKeywordInput(e.target.value)}
+            onChange={e => onKeywordChange(e.target.value)}
             onKeyDown={onKeywordKeyDown}
             onBlur={addKeyword}
-            placeholder={form.keywords.length === 0 ? 'dracaufeu, lot pokemon...' : ''}
+            placeholder="dracaufeu, lot pokemon..."
             data-testid="keyword-input"
-            className="flex-1 min-w-[120px] bg-transparent text-white placeholder-gray-500 focus:outline-none text-sm py-0.5"
+            className="w-full min-w-[120px] bg-transparent text-white placeholder-gray-500 focus:outline-none text-sm py-0.5"
           />
         </div>
+        {form.keywords.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {form.keywords.map(kw => (
+              <span key={kw} className="inline-flex items-center gap-2 bg-yellow-500/20 text-yellow-400 text-sm px-3 py-1 rounded-full border border-yellow-500/30">
+                <span>{kw}</span>
+                <button
+                  type="button"
+                  onClick={() => removeKeyword(kw)}
+                  className="text-yellow-300 hover:text-yellow-100 leading-none cursor-pointer"
+                  aria-label={`Supprimer ${kw}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Plateformes */}
@@ -142,7 +180,7 @@ export default function SearchForm({ initialData, onSubmit, submitLabel }: Props
                   : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-600'
               }`}
             >
-              {form.platforms.includes(p.id) ? '✓ ' : ''}{p.label}
+              {form.platforms.includes(p.id) ? <CheckIcon className="w-4 h-4 inline-block align-text-bottom mr-1" /> : null}{p.label}
             </button>
           ))}
         </div>
@@ -163,7 +201,7 @@ export default function SearchForm({ initialData, onSubmit, submitLabel }: Props
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
           </div>
-          <span className="text-gray-500">→</span>
+          <span className="text-gray-500"><ArrowRightIcon className="w-4 h-4 inline-block align-text-bottom" /></span>
           <div className="relative flex-1">
             <input
               type="number"

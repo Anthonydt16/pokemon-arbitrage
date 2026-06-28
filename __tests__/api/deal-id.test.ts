@@ -24,7 +24,7 @@ describe('PATCH /api/deals/[id]', () => {
 
   it('met à jour le status', async () => {
     mockPrisma.deal.update.mockResolvedValue({ ...MOCK_DEAL, status: 'seen' })
-    const req = new NextRequest('http://localhost:3001/api/deals/deal-1', {
+    const req = new NextRequest('http://localhost:3333/api/deals/deal-1', {
       method: 'PATCH',
       body: JSON.stringify({ status: 'seen' }),
       headers: { 'Content-Type': 'application/json' },
@@ -39,7 +39,7 @@ describe('PATCH /api/deals/[id]', () => {
 
   it('met à jour vers dismissed', async () => {
     mockPrisma.deal.update.mockResolvedValue({ ...MOCK_DEAL, status: 'dismissed' })
-    const req = new NextRequest('http://localhost:3001/api/deals/deal-1', {
+    const req = new NextRequest('http://localhost:3333/api/deals/deal-1', {
       method: 'PATCH',
       body: JSON.stringify({ status: 'dismissed' }),
       headers: { 'Content-Type': 'application/json' },
@@ -55,7 +55,7 @@ describe('DELETE /api/deals/[id]', () => {
 
   it('supprime le deal et retourne ok', async () => {
     mockPrisma.deal.delete.mockResolvedValue(MOCK_DEAL)
-    const req = new NextRequest('http://localhost:3001/api/deals/deal-1', { method: 'DELETE' })
+    const req = new NextRequest('http://localhost:3333/api/deals/deal-1', { method: 'DELETE' })
     const res = await DELETE(req, makeParams('deal-1'))
     expect(res.status).toBe(200)
     const data = await res.json()

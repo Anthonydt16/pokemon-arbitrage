@@ -1,5 +1,6 @@
 import requests
 import re
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 import urllib.parse
 import sys, os
@@ -23,6 +24,52 @@ def _parse_alt(alt: str):
     # Titre = tout avant la première virgule suivie d'un label connu
     title = re.split(r',\s*(marque|état|condition|taille|couleur)\s*:', alt, flags=re.IGNORECASE)[0].strip()
     return title, price
+
+
+def _parse_relative_datetime(text: str):
+    if not text:
+        return None
+    t = text.lower().strip()
+    now = datetime.now(timezone.utc)
+
+    if "à l'instant" in t or "a l'instant" in t or 'just now' in t:
+        return now.isoformat()
+    if 'hier' in t or 'yesterday' in t:
+        return (now - timedelta(days=1)).isoformat()
+
+    m = re.search(r'(\d+)\s*(h|heure|heures|hour|hours)', t)
+    if m:
+        return (now - timedelta(hours=int(m.group(1)))).isoformat()
+
+    m = re.search(r'(\d+)\s*(j|jour|jours|day|days)', t)
+    if m:
+        return (now - timedelta(days=int(m.group(1)))).isoformat()
+
+    return None
+
+
+def _extract_published_at(item):
+    # Prefer explicit datetime from <time datetime="...">
+    time_el = item.find('time')
+    if time_el:
+        dt_raw = (time_el.get('datetime') or '').strip()
+        if dt_raw:
+            try:
+                dt = datetime.fromisoformat(dt_raw.replace('Z', '+00:00'))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.astimezone(timezone.utc).isoformat()
+            except Exception:
+                pass
+
+        rel = time_el.get_text(' ', strip=True)
+        rel_iso = _parse_relative_datetime(rel)
+        if rel_iso:
+            return rel_iso
+
+    # Fallback on full card text if relative date is present
+    card_text = item.get_text(' ', strip=True)
+    return _parse_relative_datetime(card_text)
 
 
 def scrape(keywords: list, min_price: float, max_price: float) -> list:
@@ -84,6 +131,7 @@ def scrape(keywords: list, min_price: float, max_price: float) -> list:
                     'location': None,
                     'isPro': is_pro,
                     'photoCount': photo_count,
+                    'publishedAt': _extract_published_at(item),
                 })
             except Exception:
                 continue

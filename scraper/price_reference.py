@@ -25,6 +25,8 @@ SEALED_KEYWORDS = [
     'etb', 'elite trainer', 'coffret dresseur', 'display', '36 boosters',
     'upc', 'ultra premium', 'coffret', 'bundle', 'lot boosters', 'booster box',
     'boite boosters', 'collection premium',
+    # Tripacks / trip pack variants (éviter de confondre avec ETB)
+    'tripack', 'trip pack', 'trip-pack', 'trip-pack',
 ]
 
 _cache: dict = {}
@@ -173,7 +175,7 @@ def get_reference_price(
     """
     result = {
         'reference_price': scraped_median,  # médiane fraîche du scan en cours
-        'source': 'median_local',
+        'source': 'median',
         'tcg_price_eur': None,
         'confidence_boost': False,
         'warning': None,
@@ -210,7 +212,7 @@ def get_reference_price(
         result['warning'] = f"Médiane biaisée ({scraped_count} rés.), CM={tcg_price}€"
     else:
         # Cohérents → médiane locale + confiance boostée
-        result['source'] = 'median_local'
+        result['source'] = 'median'
         result['confidence_boost'] = True
 
     return result
