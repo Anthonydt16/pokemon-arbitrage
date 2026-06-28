@@ -17,6 +17,7 @@ services:
       retries: 10
 
   web:
+    image: ${WEB_IMAGE:-pokemon-arbitrage-web}
     build:
       context: .
       dockerfile: Dockerfile
