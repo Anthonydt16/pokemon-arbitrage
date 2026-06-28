@@ -4,16 +4,18 @@
  */
 
 import { render, screen } from '@testing-library/react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 
 jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
+  useRouter: jest.fn(),
 }))
 
 describe('Navbar', () => {
   beforeEach(() => {
     (usePathname as jest.Mock).mockReturnValue('/')
+    ;(useRouter as jest.Mock).mockReturnValue({ push: jest.fn() })
   })
 
   it('affiche le logo PokéArbitrage', () => {
