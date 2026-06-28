@@ -55,14 +55,14 @@ describe('GET /api/searches/[id]', () => {
 
   it('retourne 404 si introuvable', async () => {
     mockPrisma.search.findUnique.mockResolvedValue(null)
-    const req = new NextRequest('http://localhost:3001/api/searches/xxx', { method: 'GET' })
+    const req = new NextRequest('http://localhost:3333/api/searches/xxx', { method: 'GET' })
     const res = await GET(req, makeParams('xxx'))
     expect(res.status).toBe(404)
   })
 
   it('retourne la search avec keywords/platforms parsés', async () => {
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_SEARCH)
-    const req = new NextRequest('http://localhost:3001/api/searches/search-1', { method: 'GET' })
+    const req = new NextRequest('http://localhost:3333/api/searches/search-1', { method: 'GET' })
     const res = await GET(req, makeParams('search-1'))
     expect(res.status).toBe(200)
     const data = await res.json()
@@ -77,7 +77,7 @@ describe('PATCH /api/searches/[id]', () => {
   it('retourne 403 si la search est globale', async () => {
     mockGetAuthUser.mockReturnValue(MOCK_USER)
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_GLOBAL_SEARCH)
-    const req = new NextRequest('http://localhost:3001/api/searches/global-1', {
+    const req = new NextRequest('http://localhost:3333/api/searches/global-1', {
       method: 'PATCH',
       body: JSON.stringify({ name: 'Hack' }),
       headers: { 'Content-Type': 'application/json' },
@@ -89,7 +89,7 @@ describe('PATCH /api/searches/[id]', () => {
   it('retourne 403 si l\'user n\'est pas propriétaire', async () => {
     mockGetAuthUser.mockReturnValue({ userId: 'other-user', email: 'x@x.com' })
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_SEARCH) // userId: user-1
-    const req = new NextRequest('http://localhost:3001/api/searches/search-1', {
+    const req = new NextRequest('http://localhost:3333/api/searches/search-1', {
       method: 'PATCH',
       body: JSON.stringify({ name: 'Hack' }),
       headers: { 'Content-Type': 'application/json' },
@@ -103,7 +103,7 @@ describe('PATCH /api/searches/[id]', () => {
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_SEARCH)
     const updated = { ...MOCK_SEARCH, name: 'Pikachu' }
     mockPrisma.search.update.mockResolvedValue(updated)
-    const req = new NextRequest('http://localhost:3001/api/searches/search-1', {
+    const req = new NextRequest('http://localhost:3333/api/searches/search-1', {
       method: 'PATCH',
       body: JSON.stringify({ name: 'Pikachu' }),
       headers: { 'Content-Type': 'application/json' },
@@ -118,7 +118,7 @@ describe('PATCH /api/searches/[id]', () => {
     mockGetAuthUser.mockReturnValue(MOCK_USER)
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_SEARCH)
     mockPrisma.search.update.mockResolvedValue({ ...MOCK_SEARCH, keywords: '["etb","pikachu"]' })
-    const req = new NextRequest('http://localhost:3001/api/searches/search-1', {
+    const req = new NextRequest('http://localhost:3333/api/searches/search-1', {
       method: 'PATCH',
       body: JSON.stringify({ keywords: ['etb', 'pikachu'] }),
       headers: { 'Content-Type': 'application/json' },
@@ -136,7 +136,7 @@ describe('DELETE /api/searches/[id]', () => {
   it('retourne 403 si la search est globale', async () => {
     mockGetAuthUser.mockReturnValue(MOCK_USER)
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_GLOBAL_SEARCH)
-    const req = new NextRequest('http://localhost:3001/api/searches/global-1', { method: 'DELETE' })
+    const req = new NextRequest('http://localhost:3333/api/searches/global-1', { method: 'DELETE' })
     const res = await DELETE(req, makeParams('global-1'))
     expect(res.status).toBe(403)
     expect(mockPrisma.search.delete).not.toHaveBeenCalled()
@@ -145,7 +145,7 @@ describe('DELETE /api/searches/[id]', () => {
   it('retourne 403 si l\'user n\'est pas propriétaire', async () => {
     mockGetAuthUser.mockReturnValue({ userId: 'hacker', email: 'h@h.com' })
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_SEARCH)
-    const req = new NextRequest('http://localhost:3001/api/searches/search-1', { method: 'DELETE' })
+    const req = new NextRequest('http://localhost:3333/api/searches/search-1', { method: 'DELETE' })
     const res = await DELETE(req, makeParams('search-1'))
     expect(res.status).toBe(403)
     expect(mockPrisma.search.delete).not.toHaveBeenCalled()
@@ -155,7 +155,7 @@ describe('DELETE /api/searches/[id]', () => {
     mockGetAuthUser.mockReturnValue(MOCK_USER)
     mockPrisma.search.findUnique.mockResolvedValue(MOCK_SEARCH)
     mockPrisma.search.delete.mockResolvedValue(MOCK_SEARCH)
-    const req = new NextRequest('http://localhost:3001/api/searches/search-1', { method: 'DELETE' })
+    const req = new NextRequest('http://localhost:3333/api/searches/search-1', { method: 'DELETE' })
     const res = await DELETE(req, makeParams('search-1'))
     expect(res.status).toBe(200)
     const data = await res.json()

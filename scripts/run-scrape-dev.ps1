@@ -10,4 +10,4 @@ Write-Host "[1/2] Start db service..."
 docker-compose up -d db
 
 Write-Host "[2/2] Run scraper against local dev web API..."
-docker-compose run --rm -e API_BASE=http://host.docker.internal:3001/api scraper python daily_scan.py
+docker-compose run --rm -e API_BASE=http://host.docker.internal:3333/api scraper python daily_scan.py

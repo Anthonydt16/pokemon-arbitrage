@@ -188,21 +188,21 @@ class TestPriceReference(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────
 
 class TestAPI(unittest.TestCase):
-    BASE = 'http://localhost:3001/api'
+    BASE = 'http://localhost:3333/api'
 
     def _get(self, path):
         import requests
         try:
             return requests.get(self.BASE + path, timeout=5)
         except Exception:
-            self.skipTest("App Next.js non disponible sur :3001")
+            self.skipTest("App Next.js non disponible sur :3333")
 
     def _post(self, path, body):
         import requests
         try:
             return requests.post(self.BASE + path, json=body, timeout=5)
         except Exception:
-            self.skipTest("App Next.js non disponible sur :3001")
+            self.skipTest("App Next.js non disponible sur :3333")
 
     def test_searches_returns_list(self):
         r = self._get('/searches')

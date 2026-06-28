@@ -54,7 +54,7 @@ const MOCK_GLOBAL_SEARCH = {
   userId: null,
 }
 
-const makeGetReq = (token?: string) => new NextRequest('http://localhost:3001/api/searches', {
+const makeGetReq = (token?: string) => new NextRequest('http://localhost:3333/api/searches', {
   method: 'GET',
   headers: token ? { Authorization: `Bearer ${token}` } : {},
 })
@@ -110,7 +110,7 @@ describe('POST /api/searches', () => {
   it('sans auth — retourne 401', async () => {
     mockGetAuthUser.mockReturnValue(null)
 
-    const req = new NextRequest('http://localhost:3001/api/searches', {
+    const req = new NextRequest('http://localhost:3333/api/searches', {
       method: 'POST',
       body: JSON.stringify({ name: 'Test', keywords: ['a'], platforms: ['vinted'], minPrice: 0, maxPrice: 50 }),
       headers: { 'Content-Type': 'application/json' },
@@ -140,7 +140,7 @@ describe('POST /api/searches', () => {
       isGlobal: false,
     })
 
-    const req = new NextRequest('http://localhost:3001/api/searches', {
+    const req = new NextRequest('http://localhost:3333/api/searches', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
@@ -164,7 +164,7 @@ describe('POST /api/searches', () => {
     const body = { name: 'Test', keywords: ['a', 'b'], platforms: ['vinted'], minPrice: 0, maxPrice: 50, active: true }
     mockPrisma.search.create.mockResolvedValue({ ...MOCK_SEARCH, keywords: '["a","b"]', platforms: '["vinted"]' })
 
-    const req = new NextRequest('http://localhost:3001/api/searches', {
+    const req = new NextRequest('http://localhost:3333/api/searches', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },

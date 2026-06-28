@@ -22,7 +22,7 @@ from trust_score import compute_trust
 from product_detector import detect_type, detect_extension
 
 DB_URL = os.environ.get('DATABASE_URL', 'postgresql://pokemon:pokemon@localhost:5432/pokemon')
-API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
+API_BASE = os.environ.get('API_BASE', 'http://localhost:3333/api')
 SCRAPER_API_KEY = os.environ.get('SCRAPER_API_KEY', 'scraper-internal-key-2026')
 SCRAPER_HEADERS = {'x-scraper-key': SCRAPER_API_KEY}
 DEAL_THRESHOLD_PCT = 15

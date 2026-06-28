@@ -21,7 +21,7 @@ from trust_score import compute_trust
 from product_detector import group_by_product
 
 DB_URL = os.environ.get('DATABASE_URL', 'postgresql://pokemon:pokemon@localhost:5432/pokemon')
-API_BASE = os.environ.get('API_BASE', 'http://localhost:3001/api')
+API_BASE = os.environ.get('API_BASE', 'http://localhost:3333/api')
 MIN_MARGIN = 15
 
 

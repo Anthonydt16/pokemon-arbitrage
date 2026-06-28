@@ -20,4 +20,4 @@ docker-compose run --rm web npx prisma db push --accept-data-loss
 
 Write-Host "[5/5] Start daily scraper run..."
 # Force scraper API target to internal compose network.
-docker-compose run --rm -e API_BASE=http://web:3001/api scraper python daily_scan.py
+docker-compose run --rm -e API_BASE=http://web:3333/api scraper python daily_scan.py

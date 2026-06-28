@@ -31,13 +31,13 @@ jest.mock('@/lib/auth', () => ({
 import { POST as register } from '@/app/api/auth/register/route'
 import { POST as login } from '@/app/api/auth/login/route'
 
-const makeRegisterReq = (body: object) => new NextRequest('http://localhost:3001/api/auth/register', {
+const makeRegisterReq = (body: object) => new NextRequest('http://localhost:3333/api/auth/register', {
   method: 'POST',
   body: JSON.stringify(body),
   headers: { 'Content-Type': 'application/json' },
 })
 
-const makeLoginReq = (body: object) => new NextRequest('http://localhost:3001/api/auth/login', {
+const makeLoginReq = (body: object) => new NextRequest('http://localhost:3333/api/auth/login', {
   method: 'POST',
   body: JSON.stringify(body),
   headers: { 'Content-Type': 'application/json' },

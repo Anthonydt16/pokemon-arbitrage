@@ -32,7 +32,7 @@ describe('POST /api/deals — validation prix', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('retourne 400 si price est undefined', async () => {
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify({ searchId: 's1', title: 'test', url: 'https://x.com/1', platform: 'vinted' }),
       headers: { 'Content-Type': 'application/json' },
@@ -43,7 +43,7 @@ describe('POST /api/deals — validation prix', () => {
   })
 
   it('retourne 400 si price est NaN', async () => {
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify({ searchId: 's1', title: 'test', url: 'https://x.com/2', platform: 'vinted', price: 'abc' }),
       headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ describe('POST /api/deals — validation prix', () => {
   })
 
   it('retourne 400 si url manquante', async () => {
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify({ searchId: 's1', title: 'test', price: 10, platform: 'vinted' }),
       headers: { 'Content-Type': 'application/json' },
@@ -64,7 +64,7 @@ describe('POST /api/deals — validation prix', () => {
   })
 
   it('retourne 400 si platform manquante', async () => {
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify({ searchId: 's1', title: 'test', price: 10, url: 'https://x.com/3' }),
       headers: { 'Content-Type': 'application/json' },
@@ -84,7 +84,7 @@ describe('POST /api/deals — searchId validation', () => {
     mockPrisma.deal.findUnique.mockResolvedValue(null)
     mockPrisma.search.findUnique.mockResolvedValue(null)
 
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify({ searchId: 'inexistant', title: 'test', price: 10, url: 'https://x.com/4', platform: 'vinted' }),
       headers: { 'Content-Type': 'application/json' },
@@ -104,7 +104,7 @@ describe('GET /api/deals — rate limiting', () => {
   it('répond normalement sur des requêtes standard', async () => {
     mockPrisma.deal.findMany.mockResolvedValue([])
     mockPrisma.deal.count.mockResolvedValue(0)
-    const req = new NextRequest('http://localhost:3001/api/deals')
+    const req = new NextRequest('http://localhost:3333/api/deals')
     const res = await GET(req)
     // 200 ou 429 — doit au moins répondre sans crash
     expect([200, 429]).toContain(res.status)
@@ -135,7 +135,7 @@ describe('POST /api/deals — trust score fields', () => {
     mockPrisma.deal.findUnique.mockResolvedValue(null) // pas de doublon
     mockPrisma.deal.create.mockResolvedValue(mockDeal)
 
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify({
         searchId: 's1',
@@ -171,7 +171,7 @@ describe('GET /api/deals — pagination', () => {
   it('hasMore = false quand on est à la dernière page', async () => {
     mockPrisma.deal.findMany.mockResolvedValue([DEAL])
     mockPrisma.deal.count.mockResolvedValue(1)
-    const req = new NextRequest('http://localhost:3001/api/deals?page=1&limit=20')
+    const req = new NextRequest('http://localhost:3333/api/deals?page=1&limit=20')
     const res = await GET(req)
     const data = await res.json()
     expect(data.hasMore).toBe(false)
@@ -180,7 +180,7 @@ describe('GET /api/deals — pagination', () => {
   it('hasMore = true quand il reste des pages', async () => {
     mockPrisma.deal.findMany.mockResolvedValue(Array(20).fill(DEAL))
     mockPrisma.deal.count.mockResolvedValue(50)
-    const req = new NextRequest('http://localhost:3001/api/deals?page=1&limit=20')
+    const req = new NextRequest('http://localhost:3333/api/deals?page=1&limit=20')
     const res = await GET(req)
     const data = await res.json()
     expect(data.hasMore).toBe(true)
@@ -189,7 +189,7 @@ describe('GET /api/deals — pagination', () => {
   it('skip correct à la page 2', async () => {
     mockPrisma.deal.findMany.mockResolvedValue([])
     mockPrisma.deal.count.mockResolvedValue(0)
-    const req = new NextRequest('http://localhost:3001/api/deals?page=2&limit=20')
+    const req = new NextRequest('http://localhost:3333/api/deals?page=2&limit=20')
     await GET(req)
     expect(mockPrisma.deal.findMany.mock.calls[0][0].skip).toBe(20)
   })

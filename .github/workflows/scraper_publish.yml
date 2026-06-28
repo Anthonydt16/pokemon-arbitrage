@@ -24,7 +24,7 @@ jobs:
 
       - name: Run scraper and save report
         env:
-          API_BASE: ${{ secrets.SCRAPER_API_BASE || 'http://localhost:3001/api' }}
+          API_BASE: ${{ secrets.SCRAPER_API_BASE || 'http://localhost:3333/api' }}
           SCRAPER_KEY: ${{ secrets.SCRAPER_KEY || 'scraper-internal-key-2026' }}
         run: |
           mkdir -p out/scraper

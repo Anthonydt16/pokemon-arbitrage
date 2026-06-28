@@ -28,7 +28,7 @@ PokéArbitrage scrappe en temps réel **LeBonCoin**, **Vinted** et **eBay**, com
 # Installer les dépendances
 npm install
 
-# Lancer l'app web (port 3001)
+# Lancer l'app web (port 3333)
 npm run dev
 
 # Lancer le scraper (scan toutes les 15 min)

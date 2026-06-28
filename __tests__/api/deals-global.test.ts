@@ -46,7 +46,7 @@ describe('GET /api/deals/global', () => {
     mockPrisma.deal.findMany.mockResolvedValue([MOCK_DEAL])
 
     // No auth header
-    const req = new NextRequest('http://localhost:3001/api/deals/global', { method: 'GET' })
+    const req = new NextRequest('http://localhost:3333/api/deals/global', { method: 'GET' })
     const res = await GET(req)
 
     expect(res.status).toBe(200)
@@ -56,7 +56,7 @@ describe('GET /api/deals/global', () => {
     mockPrisma.search.findMany.mockResolvedValue([MOCK_GLOBAL_SEARCH])
     mockPrisma.deal.findMany.mockResolvedValue([MOCK_DEAL])
 
-    const res = await GET(new NextRequest('http://localhost:3001/api/deals/global'))
+    const res = await GET(new NextRequest('http://localhost:3333/api/deals/global'))
     const data = await res.json()
 
     expect(data.searches).toHaveLength(1)
@@ -68,7 +68,7 @@ describe('GET /api/deals/global', () => {
   it('retourne des tableaux vides si aucune recherche globale', async () => {
     mockPrisma.search.findMany.mockResolvedValue([])
 
-    const res = await GET(new NextRequest('http://localhost:3001/api/deals/global'))
+    const res = await GET(new NextRequest('http://localhost:3333/api/deals/global'))
     const data = await res.json()
 
     expect(data.searches).toEqual([])
@@ -81,7 +81,7 @@ describe('GET /api/deals/global', () => {
     mockPrisma.search.findMany.mockResolvedValue([MOCK_GLOBAL_SEARCH])
     mockPrisma.deal.findMany.mockResolvedValue([MOCK_DEAL])
 
-    const res = await GET(new NextRequest('http://localhost:3001/api/deals/global'))
+    const res = await GET(new NextRequest('http://localhost:3333/api/deals/global'))
     const data = await res.json()
 
     expect(data).toHaveProperty('searches')

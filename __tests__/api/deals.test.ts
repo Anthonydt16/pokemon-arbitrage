@@ -47,7 +47,7 @@ describe('GET /api/deals', () => {
     mockPrisma.deal.findMany.mockResolvedValue([MOCK_DEAL])
     mockPrisma.deal.count.mockResolvedValue(1)
 
-    const req = new NextRequest('http://localhost:3001/api/deals?page=1&limit=50')
+    const req = new NextRequest('http://localhost:3333/api/deals?page=1&limit=50')
     const res = await GET(req)
     const data = await res.json()
 
@@ -66,7 +66,7 @@ describe('GET /api/deals', () => {
     mockPrisma.deal.findMany.mockResolvedValue([])
     mockPrisma.deal.count.mockResolvedValue(0)
 
-    const req = new NextRequest('http://localhost:3001/api/deals?status=new')
+    const req = new NextRequest('http://localhost:3333/api/deals?status=new')
     await GET(req)
 
     const callArgs = mockPrisma.deal.findMany.mock.calls[0][0]
@@ -77,7 +77,7 @@ describe('GET /api/deals', () => {
     mockPrisma.deal.findMany.mockResolvedValue([])
     mockPrisma.deal.count.mockResolvedValue(0)
 
-    const req = new NextRequest('http://localhost:3001/api/deals?platform=vinted')
+    const req = new NextRequest('http://localhost:3333/api/deals?platform=vinted')
     await GET(req)
 
     const callArgs = mockPrisma.deal.findMany.mock.calls[0][0]
@@ -89,7 +89,7 @@ describe('GET /api/deals', () => {
     mockPrisma.deal.findMany.mockResolvedValue(Array(50).fill(MOCK_DEAL))
     mockPrisma.deal.count.mockResolvedValue(60)
 
-    const req = new NextRequest('http://localhost:3001/api/deals?page=1&limit=50')
+    const req = new NextRequest('http://localhost:3333/api/deals?page=1&limit=50')
     const res = await GET(req)
     const data = await res.json()
     expect(data.hasMore).toBe(true)
@@ -113,7 +113,7 @@ describe('POST /api/deals', () => {
       cardMarketPrice: 100,
       margin: 25,
     }
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
@@ -129,7 +129,7 @@ describe('POST /api/deals', () => {
     mockPrisma.deal.findUnique.mockResolvedValue(MOCK_DEAL) // doublon
 
     const body = { searchId: 'x', title: 'ETB', price: 75, url: 'https://vinted.fr/items/123', platform: 'vinted' }
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
@@ -142,7 +142,7 @@ describe('POST /api/deals', () => {
 
   it('retourne 400 si champs manquants', async () => {
     const body = { title: 'ETB', price: 75, url: 'https://vinted.fr/items/123', platform: 'vinted' } // pas de searchId
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +159,7 @@ describe('POST /api/deals', () => {
     mockPrisma.search.findUnique.mockResolvedValue(null) // search inexistante
 
     const body = { searchId: 'unknown-id', title: 'ETB', price: 75, url: 'https://vinted.fr/items/456', platform: 'vinted' }
-    const req = new NextRequest('http://localhost:3001/api/deals', {
+    const req = new NextRequest('http://localhost:3333/api/deals', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
