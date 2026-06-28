@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 type Theme = 'dark' | 'light'
 
@@ -14,16 +14,13 @@ const ThemeContext = createContext<ThemeContextValue>({
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark')
-
-  useEffect(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'dark'
     const stored = localStorage.getItem('pokesnoop-theme') as Theme | null
-    const preferred = stored ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    setTheme(preferred)
-    applyTheme(preferred)
-  }, [])
+    return stored ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  })
 
-  const applyTheme = (t: Theme) => {
+  const applyTheme = useCallback((t: Theme) => {
     const html = document.documentElement
     if (t === 'dark') {
       html.classList.add('dark')
@@ -36,7 +33,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.body.style.backgroundColor = '#f9fafb'
       document.body.style.color = '#111827'
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme, applyTheme])
 
   const toggleTheme = () => {
     setTheme(prev => {

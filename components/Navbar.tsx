@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useI18n } from '@/lib/i18n'
 import { clearAuth, getEmail } from '@/lib/client-auth'
 import { useTheme } from '@/lib/theme'
@@ -10,7 +10,7 @@ import { SunIcon, MoonIcon, Cog6ToothIcon, GlobeAltIcon } from '@heroicons/react
 
 export default function Navbar() {
   const pathname = usePathname()
-  const router = typeof useRouter === 'function' ? useRouter() : { push: () => {} }
+  const router = useRouter()
   let locale = ''
   let t = (key: string) => key
   try {
@@ -30,15 +30,11 @@ export default function Navbar() {
       return fallback[key] ?? key
     }
   }
-  const [email, setEmail] = useState<string | null>(null)
+  const email = getEmail()
   const [langOpen, setLangOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
   const basePath = locale ? `/${locale}` : ''
-
-  useEffect(() => {
-    setEmail(getEmail())
-  }, [pathname])
 
   const links = [
     { href: basePath || '/', label: t('nav.dashboard') },
@@ -48,7 +44,6 @@ export default function Navbar() {
 
   const logout = () => {
     clearAuth()
-    setEmail(null)
     router.push(`${basePath || ''}/login` || '/login')
   }
 

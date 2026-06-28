@@ -1,6 +1,6 @@
 'use client'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
 import { authHeaders, getToken } from '@/lib/client-auth'
 import SearchForm, { SearchFormData } from '@/components/SearchForm'
@@ -23,14 +23,15 @@ export default function SearchesPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const searchParamsKey = searchParams.toString()
   const [items, setItems] = useState<SearchItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => Boolean(getToken()))
   const [error, setError] = useState('')
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
   const [editingItem, setEditingItem] = useState<SearchItem | null>(null)
   const [localSuccessMessage, setLocalSuccessMessage] = useState('')
 
-  const loadSearches = async () => {
+  const loadSearches = useCallback(async () => {
     setError('')
     try {
       const res = await fetch('/api/searches', { headers: authHeaders() })
@@ -39,21 +40,22 @@ export default function SearchesPage() {
       }
       const data = await res.json()
       setItems(Array.isArray(data) ? data : [])
-    } catch (e) {
+    } catch {
       setError(t('messages.error'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [t])
 
   useEffect(() => {
     if (!getToken()) {
-      setLoading(false)
       router.replace(`/${locale}`)
       return
     }
-    loadSearches()
-  }, [pathname, searchParams.toString(), locale, router])
+    queueMicrotask(() => {
+      void loadSearches()
+    })
+  }, [pathname, searchParamsKey, locale, router, loadSearches])
 
   const toggleActive = async (item: SearchItem) => {
     if (item.readonly || item.isGlobal) return

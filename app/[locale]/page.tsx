@@ -28,6 +28,8 @@ import {
   LockClosedIcon
 } from '@heroicons/react/24/outline'
 
+type Translator = (key: string) => string
+
 type Deal = {
   id: string
   title: string
@@ -80,7 +82,7 @@ function DealCard({ deal, onStatus, onDelete, blurred, t }: {
   onStatus?: (id: string, s: string) => void
   onDelete?: (id: string) => void
   blurred?: boolean
-  t: any
+  t: Translator
 }) {
   const TRUST_CONFIG: Record<string, { label: string; className: string }> = {
     safe: { label: t('deals.safe'), className: 'bg-green-500/20 text-green-400 border border-green-500/40' },
@@ -187,7 +189,7 @@ function DealCard({ deal, onStatus, onDelete, blurred, t }: {
 }
 
 // LANDING PAGE
-function LandingPage({ t }: { t: any }) {
+function LandingPage({ t }: { t: Translator }) {
   const [topDeals, setTopDeals] = useState<Deal[]>([])
   const [loadingDeals, setLoadingDeals] = useState(true)
 
@@ -202,8 +204,6 @@ function LandingPage({ t }: { t: any }) {
   }, [])
 
   const visibleDeals = topDeals.slice(0, 5)
-  const hiddenDeals = topDeals.slice(5)
-
   const features = [
     { icon: <BellAlertIcon className="w-8 h-8 text-yellow-400 mx-auto" />, title: t('home.activeSearches'), desc: "Ne ratez plus jamais une bonne affaire" },
     { icon: <CpuChipIcon className="w-8 h-8 text-blue-400 mx-auto" />, title: 'Scraping automatique', desc: 'Leboncoin, Vinted, eBay scannés 3× par jour' },
@@ -310,10 +310,9 @@ function LandingPage({ t }: { t: any }) {
 }
 
 // DASHBOARD
-function Dashboard({ t }: { t: any }) {
+function Dashboard({ t }: { t: Translator }) {
   const RECENT_DEALS_PAGE_SIZE = 20
   const [bestToday, setBestToday] = useState<BestToday | null>(null)
-  const [topDeals, setTopDeals] = useState<{ global: Deal[]; personal: Deal[] }>({ global: [], personal: [] })
   const [recentDeals, setRecentDeals] = useState<Deal[]>([])
   const [recentTotal, setRecentTotal] = useState(0)
   const [recentPage, setRecentPage] = useState(1)
@@ -323,7 +322,7 @@ function Dashboard({ t }: { t: any }) {
   const [statusFilter, setStatusFilter] = useState('new')
   const [platformFilter, setPlatformFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => Boolean(getToken()))
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
   const getSinceIsoForFilter = useCallback((filter: string): string | undefined => {
@@ -353,7 +352,6 @@ function Dashboard({ t }: { t: any }) {
   useEffect(() => {
     const token = getToken()
     if (!token) {
-      setLoading(false)
       return
     }
 
@@ -367,12 +365,10 @@ function Dashboard({ t }: { t: any }) {
 
     Promise.all([
       fetch('/api/deals/best-today', { headers }).then(r => r.ok ? r.json() : null),
-      fetch('/api/deals/top?limit=10', { headers }).then(r => r.ok ? r.json() : null),
       fetch(`/api/deals?${params.toString()}`, { headers }).then(r => r.ok ? r.json() : null),
       fetch(`/api/deals?${baseStatsParams.toString()}`, { headers }).then(r => r.ok ? r.json() : null),
-    ]).then(([best, top, deals, totalStats]) => {
+    ]).then(([best, deals, totalStats]) => {
       if (best) setBestToday(best)
-      if (top) setTopDeals({ global: top.global ?? [], personal: top.personal ?? [] })
       if (deals) {
         setRecentDeals(deals.deals || [])
         setRecentTotal(typeof deals.total === 'number' ? deals.total : 0)

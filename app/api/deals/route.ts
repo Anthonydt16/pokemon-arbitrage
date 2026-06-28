@@ -34,7 +34,7 @@ function parsePublishedAt(value: unknown): Date | null {
 }
 
 export async function GET(req: NextRequest) {
-  const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
+  const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1'
   if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
   const user = getAuthUser(req)
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const ip = (req as any).headers?.get?.('x-forwarded-for') ?? '127.0.0.1'
+  const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1'
   if (ip !== '127.0.0.1' && ip !== '::1' && !rateLimit(ip)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
   const body = await req.json()

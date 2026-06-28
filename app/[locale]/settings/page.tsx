@@ -19,14 +19,13 @@ export default function SettingsPage() {
     alertMinMargin: 15,
     alertGlobal: true,
   })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => Boolean(getToken()))
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!getToken()) {
-      setLoading(false)
       router.replace(`/${locale}`)
       return
     }
@@ -44,7 +43,7 @@ export default function SettingsPage() {
           alertGlobal: !!data.alertGlobal,
           discordWebhookSet: !!data.discordWebhookSet,
         })
-      } catch (e) {
+      } catch {
         setError(t('messages.error'))
       } finally {
         setLoading(false)
@@ -74,7 +73,7 @@ export default function SettingsPage() {
         setSettings(prev => ({ ...prev, discordWebhookSet: !!data.discordWebhookSet }))
         setMessage(t('settings.saved'))
       }
-    } catch (e) {
+    } catch {
       setError(t('messages.error'))
     } finally {
       setSaving(false)
@@ -120,10 +119,10 @@ export default function SettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Marge minimale d'alerte (%)</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Marge minimale d&apos;alerte (%)</label>
           <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs uppercase tracking-wide text-gray-400">Seuil d'alerte</span>
+              <span className="text-xs uppercase tracking-wide text-gray-400">Seuil d&apos;alerte</span>
               <span className="bg-yellow-500 text-gray-900 text-sm font-bold px-3 py-1 rounded-full">
                 {settings.alertMinMargin}%
               </span>

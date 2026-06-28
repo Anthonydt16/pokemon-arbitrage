@@ -53,14 +53,33 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-and-build
     if: github.ref == 'refs/heads/main'
+    env:
+      SSH_PASSWORD: ${{ secrets.PASSEWORD_VPS != '' && secrets.PASSEWORD_VPS || secrets.PASSWORD_VPS }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
 
     steps:
+      - name: Validate SSH secrets
+        run: |
+          if [ -z "${{ secrets.IP_VPS }}" ]; then
+            echo "Missing secret: IP_VPS"
+            exit 1
+          fi
+          if [ -z "${{ secrets.LOGIN_VPS }}" ]; then
+            echo "Missing secret: LOGIN_VPS"
+            exit 1
+          fi
+          if [ -z "$SSH_PASSWORD" ] && [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "Missing SSH credentials: set PASSEWORD_VPS or PASSWORD_VPS, or set DEPLOY_SSH_KEY"
+            exit 1
+          fi
+
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.IP_VPS }}
           username: ${{ secrets.LOGIN_VPS }}
-          password: ${{ secrets.PASSEWORD_VPS }}
+          password: ${{ env.SSH_PASSWORD }}
+          key: ${{ env.SSH_PRIVATE_KEY }}
           port: 22
           script_stop: true
           script: |
