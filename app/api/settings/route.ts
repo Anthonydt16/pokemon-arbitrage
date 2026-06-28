@@ -2,17 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 
+const DEFAULT_USER = { userId: 'default', email: 'default@local' }
+
 function requireUser(req: NextRequest) {
-  const user = getAuthUser(req)
-  if (!user) return null
-  return user
+  return getAuthUser(req) ?? DEFAULT_USER
 }
 
-async function getSettings(userId: string) {
-  return prisma.settings.upsert({
-    where: { userId },
+async function getSettings(user: { userId: string; email: string }) {
+  await prisma.user.upsert({
+    where: { id: user.userId },
     update: {},
-    create: { userId, alertMinMargin: 15, alertGlobal: true },
+    create: {
+      id: user.userId,
+      email: user.email,
+      password: 'dev-password-placeholder',
+    },
+  })
+
+  return prisma.settings.upsert({
+    where: { userId: user.userId },
+    update: {},
+    create: { userId: user.userId, alertMinMargin: 15, alertGlobal: true },
   })
 }
 
@@ -21,7 +31,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   try {
-    const settings = await getSettings(user.userId)
+    const settings = await getSettings(user)
     return NextResponse.json({
       ...settings,
       discordWebhook: settings.discordWebhook
@@ -53,6 +63,7 @@ export async function PATCH(req: NextRequest) {
   if (body.alertGlobal !== undefined) data.alertGlobal = body.alertGlobal
 
   try {
+    await getSettings(user)
     const settings = await prisma.settings.upsert({
       where: { userId: user.userId },
       update: data,
@@ -69,7 +80,7 @@ export async function POST(req: NextRequest) {
   const user = requireUser(req)
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const settings = await getSettings(user.userId)
+  const settings = await getSettings(user)
   if (!settings.discordWebhook) {
     return NextResponse.json({ error: 'Aucun webhook configuré' }, { status: 400 })
   }

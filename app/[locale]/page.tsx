@@ -195,7 +195,8 @@ function LandingPage({ t }: { t: any }) {
     fetch('/api/deals/top?limit=10')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.global) setTopDeals(data.global)
+        if (Array.isArray(data)) setTopDeals(data)
+        else if (data?.global) setTopDeals(data.global)
       })
       .finally(() => setLoadingDeals(false))
   }, [])
