@@ -75,12 +75,21 @@ jobs:
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          PG_USER:      ${{ secrets.POSTGRES_USER }}
+          PG_PASSWORD:  ${{ secrets.POSTGRES_PASSWORD }}
+          PG_DB:        ${{ secrets.POSTGRES_DB }}
+          ENV_JWT:      ${{ secrets.JWT_SECRET }}
+          ENV_SCRAPERKEY: ${{ secrets.SCRAPER_API_KEY }}
+          ENV_DISCORD:  ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_REPO:      ${{ github.repository }}
         with:
           host: ${{ secrets.IP_VPS }}
           username: ${{ secrets.LOGIN_VPS }}
           password: ${{ env.SSH_PASSWORD }}
           key: ${{ env.SSH_PRIVATE_KEY }}
           port: 22
+          envs: PG_USER,PG_PASSWORD,PG_DB,ENV_JWT,ENV_SCRAPERKEY,ENV_DISCORD,GH_REPO
           script_stop: true
           script: |
             set -e
@@ -93,16 +102,32 @@ jobs:
               git init
             fi
 
-            # Add or update remote (safe whether it exists or not)
             git remote remove origin 2>/dev/null || true
-            git remote add origin https://github.com/${{ github.repository }}.git
+            git remote add origin "https://github.com/${GH_REPO}.git"
 
-            # Shallow fetch + hard reset (no merge conflict possible)
             git fetch --depth=1 origin main
             git checkout -B main FETCH_HEAD
 
+            # ── Generate .env from secrets ────────────────────────────────
+            PG_USER="${PG_USER:-pokemon}"
+            PG_PASSWORD="${PG_PASSWORD:-pokemon}"
+            PG_DB="${PG_DB:-pokemon}"
+
+            cat > .env <<EOF
+            DATABASE_URL=postgresql://${PG_USER}:${PG_PASSWORD}@db:5432/${PG_DB}
+            POSTGRES_USER=${PG_USER}
+            POSTGRES_PASSWORD=${PG_PASSWORD}
+            POSTGRES_DB=${PG_DB}
+            WEB_PORT=3333
+            SCRAPER_API_BASE=http://web:3333/api
+            API_BASE=http://localhost:3333/api
+            JWT_SECRET=${ENV_JWT}
+            SCRAPER_API_KEY=${ENV_SCRAPERKEY}
+            DISCORD_WEBHOOK_URL=${ENV_DISCORD}
+            EOF
+            sed -i 's/^[[:space:]]*//' .env
+
             # ── Docker ───────────────────────────────────────────────────
-            # Support both `docker compose` (v2) and `docker-compose` (v1)
             if docker compose version >/dev/null 2>&1; then
               COMPOSE="docker compose"
             else
