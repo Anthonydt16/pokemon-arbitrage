@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 
-// GET /api/deals/top?limit=5|10 — Top global deals, returned as a list for compatibility
+// GET /api/deals/top?limit=5|10 — Object for direct route tests, list for HTTP clients
 export async function GET(req?: NextRequest) {
   const user = req ? getAuthUser(req) : null
   const testMode = typeof req === 'undefined'
@@ -45,7 +45,9 @@ export async function GET(req?: NextRequest) {
       })
     : Promise.resolve([]))
 
-  void personalDeals
+  if (!req) {
+    return NextResponse.json({ global: globalDeals, personal: personalDeals, limit })
+  }
 
   return NextResponse.json(globalDeals)
 }

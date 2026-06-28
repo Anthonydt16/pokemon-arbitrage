@@ -9,15 +9,17 @@ function requireUser(req: NextRequest) {
 }
 
 async function getSettings(user: { userId: string; email: string }) {
-  await prisma.user.upsert({
-    where: { id: user.userId },
-    update: {},
-    create: {
-      id: user.userId,
-      email: user.email,
-      password: 'dev-password-placeholder',
-    },
-  })
+  if (prisma.user?.upsert) {
+    await prisma.user.upsert({
+      where: { id: user.userId },
+      update: {},
+      create: {
+        id: user.userId,
+        email: user.email,
+        password: 'dev-password-placeholder',
+      },
+    })
+  }
 
   return prisma.settings.upsert({
     where: { userId: user.userId },

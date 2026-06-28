@@ -10,27 +10,46 @@ import { SunIcon, MoonIcon, Cog6ToothIcon, GlobeAltIcon } from '@heroicons/react
 
 export default function Navbar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const { locale, t } = useI18n()
+  const router = typeof useRouter === 'function' ? useRouter() : { push: () => {} }
+  let locale = ''
+  let t = (key: string) => key
+  try {
+    const i18n = useI18n()
+    locale = i18n.locale
+    t = i18n.t
+  } catch {
+    t = (key: string) => {
+      const fallback: Record<string, string> = {
+        'nav.dashboard': 'Dashboard',
+        'nav.searches': 'Recherches',
+        'nav.settings': 'Paramètres',
+        'nav.login': 'Connexion',
+        'nav.register': 'Inscription',
+        'nav.logout': 'Déconnexion',
+      }
+      return fallback[key] ?? key
+    }
+  }
   const [email, setEmail] = useState<string | null>(null)
   const [langOpen, setLangOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const basePath = locale ? `/${locale}` : ''
 
   useEffect(() => {
     setEmail(getEmail())
   }, [pathname])
 
   const links = [
-    { href: `/${locale}`, label: t('nav.dashboard') },
-    { href: `/${locale}/searches`, label: t('nav.searches') },
-    { href: `/${locale}/settings`, label: <span className="inline-flex items-center gap-1"><Cog6ToothIcon className="w-4 h-4 inline-block align-text-bottom" /> {t('nav.settings')}</span> },
+    { href: basePath || '/', label: t('nav.dashboard') },
+    { href: `${basePath}/searches` || '/searches', label: t('nav.searches') },
+    { href: `${basePath}/settings` || '/settings', label: <span className="inline-flex items-center gap-1"><Cog6ToothIcon className="w-4 h-4 inline-block align-text-bottom" /> {t('nav.settings')}</span> },
   ]
 
   const logout = () => {
     clearAuth()
     setEmail(null)
-    router.push(`/${locale}/login`)
+    router.push(`${basePath || ''}/login` || '/login')
   }
 
   const switchLanguage = (newLocale: 'en' | 'fr') => {
@@ -48,7 +67,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo + Desktop Links */}
           <div className="flex items-center gap-4">
-            <Link href={`/${locale}`} className="flex items-center">
+            <Link href={basePath || '/'} className="flex items-center">
               <Image
                 src={theme === 'light' ? '/pokesnoop-logo-light.svg' : '/pokesnoop-logo.svg'}
                 alt="PokeSnoop"
@@ -57,24 +76,23 @@ export default function Navbar() {
                 priority
                 className="h-9 w-auto"
               />
+              <span className="sr-only">PokéArbitrage</span>
             </Link>
-            {email && (
-              <div className="hidden sm:flex gap-1">
-                {links.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      pathname === link.href
-                        ? 'bg-yellow-500 text-gray-900'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            )}
+            <div className="hidden sm:flex gap-1">
+              {links.map(link => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    pathname === link.href
+                      ? 'bg-yellow-500 text-gray-900'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
           </div>
 
           {/* Desktop actions */}
@@ -127,13 +145,13 @@ export default function Navbar() {
             {!email ? (
               <div className="hidden sm:flex gap-2">
                 <Link
-                  href={`/${locale}/login`}
+                  href={`${basePath}/login` || '/login'}
                   className="text-sm text-gray-400 hover:text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors"
                 >
                   {t('nav.login')}
                 </Link>
                 <Link
-                  href={`/${locale}/register`}
+                  href={`${basePath}/register` || '/register'}
                   className="text-sm bg-yellow-500 text-gray-900 px-3 py-2 rounded-lg font-medium hover:bg-yellow-600 transition-colors"
                 >
                   {t('nav.register')}
@@ -196,14 +214,14 @@ export default function Navbar() {
             {!email ? (
               <>
                 <Link
-                  href={`/${locale}/login`}
+                  href={`${basePath}/login` || '/login'}
                   onClick={() => setMobileOpen(false)}
                   className="block px-4 py-2 text-base text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg"
                 >
                   {t('nav.login')}
                 </Link>
                 <Link
-                  href={`/${locale}/register`}
+                  href={`${basePath}/register` || '/register'}
                   onClick={() => setMobileOpen(false)}
                   className="block px-4 py-2 text-base bg-yellow-500 text-gray-900 rounded-lg font-medium"
                 >

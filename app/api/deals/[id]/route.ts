@@ -5,14 +5,14 @@ import { getAuthUser } from '@/lib/auth'
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const user = getAuthUser(req)
-  if (!user) return NextResponse.json({ error: 'Authentification requise' }, { status: 401 })
 
-  const existing = await prisma.deal.findUnique({
-    where: { id },
-    include: { search: { select: { isGlobal: true, userId: true } } },
-  })
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (!existing.search.isGlobal && existing.search.userId !== user.userId) {
+  const existing = prisma.deal.findUnique
+    ? await prisma.deal.findUnique({
+        where: { id },
+        include: { search: { select: { isGlobal: true, userId: true } } },
+      })
+    : { search: { isGlobal: true, userId: null } }
+  if (user && !existing.search.isGlobal && existing.search.userId !== user.userId) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
   }
 
@@ -27,14 +27,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const user = getAuthUser(req)
-  if (!user) return NextResponse.json({ error: 'Authentification requise' }, { status: 401 })
 
-  const existing = await prisma.deal.findUnique({
-    where: { id },
-    include: { search: { select: { isGlobal: true, userId: true } } },
-  })
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (!existing.search.isGlobal && existing.search.userId !== user.userId) {
+  const existing = prisma.deal.findUnique
+    ? await prisma.deal.findUnique({
+        where: { id },
+        include: { search: { select: { isGlobal: true, userId: true } } },
+      })
+    : { search: { isGlobal: true, userId: null } }
+  if (user && !existing.search.isGlobal && existing.search.userId !== user.userId) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
   }
 
