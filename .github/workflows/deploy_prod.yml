@@ -84,15 +84,30 @@ jobs:
           script_stop: true
           script: |
             set -e
+
+            # ── Setup repo ───────────────────────────────────────────────
             mkdir -p ~/pokesnoop
             cd ~/pokesnoop
+
             if [ ! -d .git ]; then
               git init
-              git remote add origin https://github.com/${{ github.repository }}.git
-            else
-              git remote set-url origin https://github.com/${{ github.repository }}.git
             fi
+
+            # Add or update remote (safe whether it exists or not)
+            git remote remove origin 2>/dev/null || true
+            git remote add origin https://github.com/${{ github.repository }}.git
+
+            # Shallow fetch + hard reset (no merge conflict possible)
             git fetch --depth=1 origin main
             git checkout -B main FETCH_HEAD
-            docker compose up -d --build
-            docker compose ps
+
+            # ── Docker ───────────────────────────────────────────────────
+            # Support both `docker compose` (v2) and `docker-compose` (v1)
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE="docker compose"
+            else
+              COMPOSE="docker-compose"
+            fi
+
+            $COMPOSE up -d --build
+            $COMPOSE ps
