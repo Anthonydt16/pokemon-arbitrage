@@ -133,11 +133,14 @@ jobs:
             echo "🚀 Starting app with PM2..."
             pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
             pm2 save
-            pm2 startup systemd -u ${{ env.LOGIN }} --hp /root || true
+
+            # pm2 startup can be interactive on some VPS images and block CI.
+            # Run it manually once on the server if needed.
 
             ufw allow 3333/tcp || true
             ufw allow 22/tcp || true
 
             echo "✅ Deployment completed"
-            echo "URL: http://$(curl -s ifconfig.me):3333"
+            PUBLIC_IP="$(curl -s --max-time 10 ifconfig.me || echo "$IP")"
+            echo "URL: http://$PUBLIC_IP:3333"
             pm2 status
