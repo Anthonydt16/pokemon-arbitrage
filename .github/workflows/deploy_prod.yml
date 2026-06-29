@@ -19,6 +19,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build app on GitHub runner
+        run: |
+          npm ci
+          npm run build
+
       - name: Setup Node.js and PM2 on VPS
         uses: appleboy/ssh-action@master
         with:
@@ -47,12 +58,14 @@ jobs:
           rsync -av \
             --exclude='.git' \
             --exclude='node_modules' \
-            --exclude='.next' \
             --exclude='.env*' \
             --exclude='logs' \
             --exclude='*.log' \
             --exclude='.github' \
             ./ deploy-package/
+          # Ensure the Next.js build output is copied by SCP (hidden folders may be skipped by globbing)
+          rm -rf deploy-package/next-build
+          cp -R .next deploy-package/next-build
 
       - name: Copy files to VPS
         uses: appleboy/scp-action@master
@@ -116,13 +129,16 @@ jobs:
             echo "📦 Installing dependencies..."
             npm install --legacy-peer-deps
 
+            # Restore prebuilt artifacts produced in CI.
+            if [ -d next-build ]; then
+              rm -rf .next
+              mv next-build .next
+            fi
+
             echo "📦 Generating Prisma client..."
             npx prisma generate
             echo "🛠️ Running database migrations..."
             npx prisma migrate deploy
-
-            echo "🏗️ Building app..."
-            npm run build
 
             mkdir -p logs
 
