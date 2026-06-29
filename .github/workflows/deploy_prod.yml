@@ -1,4 +1,4 @@
-name: Deploy PokeSnoopToVPS
+name: Deploy PokeSnoop to VPS
 
 on:
   push:
@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      IP:    ${{ secrets.IP_VPS }}
+      IP: ${{ secrets.IP_VPS }}
+      PORT: 22
       LOGIN: ${{ secrets.LOGIN_VPS }}
+      APP_DIR: ~/pokesnoop
 
     steps:
       - name: Checkout Repository
@@ -23,20 +25,26 @@ jobs:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
           password: ${{ secrets.PASSWORD_VPS }}
-          port: 22
+          port: ${{ env.PORT }}
           script: |
-            if ! command -v node > /dev/null 2>&1; then
+            if ! command -v node >/dev/null 2>&1; then
+              echo "📦 Installing Node.js 20..."
               curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
               apt-get install -y nodejs
             fi
-            if ! command -v pm2 > /dev/null 2>&1; then
+
+            if ! command -v pm2 >/dev/null 2>&1; then
+              echo "📦 Installing PM2..."
               npm install -g pm2
             fi
-            if ! command -v nginx > /dev/null 2>&1; then
+
+            if ! command -v nginx >/dev/null 2>&1; then
+              echo "📦 Installing Nginx..."
               apt-get update -q && apt-get install -y -q nginx
             fi
+
             mkdir -p ~/pokesnoop/logs
-            echo "Serveur pret"
+            echo "✅ Folder ~/pokesnoop ready"
 
       - name: Create deployment package
         run: |
@@ -57,7 +65,7 @@ jobs:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
           password: ${{ secrets.PASSWORD_VPS }}
-          port: 22
+          port: ${{ env.PORT }}
           source: "deploy-package/*"
           target: "~/pokesnoop"
           overwrite: true
@@ -69,61 +77,88 @@ jobs:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
           password: ${{ secrets.PASSWORD_VPS }}
-          port: 22
+          port: ${{ env.PORT }}
           script: |
             cd ~/pokesnoop
 
+            POSTGRES_USER="pokemon"
+            POSTGRES_PASSWORD="pokemon"
+            POSTGRES_DB="pokemon"
+
+            EXISTING_JWT=""
+            EXISTING_SCRAPER_KEY=""
+            EXISTING_DISCORD_WEBHOOK=""
+
+            if [ -f .env ]; then
+              EXISTING_JWT="$(grep '^JWT_SECRET=' .env | head -n1 | cut -d '=' -f2-)"
+              EXISTING_SCRAPER_KEY="$(grep '^SCRAPER_API_KEY=' .env | head -n1 | cut -d '=' -f2-)"
+              EXISTING_DISCORD_WEBHOOK="$(grep '^DISCORD_WEBHOOK_URL=' .env | head -n1 | cut -d '=' -f2-)"
+            fi
+
+            [ -z "$EXISTING_JWT" ] && EXISTING_JWT="$(openssl rand -hex 32)"
+            [ -z "$EXISTING_SCRAPER_KEY" ] && EXISTING_SCRAPER_KEY="change-me"
+
+            echo "⚙️ Writing environment file..."
             cat > .env <<EOF
             NODE_ENV=production
-            DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
             WEB_PORT=3333
-            SCRAPER_API_BASE=http://host.docker.internal:3333/api
             API_BASE=http://localhost:3333/api
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}
-            DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
+            SCRAPER_API_BASE=http://host.docker.internal:3333/api
+            POSTGRES_USER=$POSTGRES_USER
+            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+            POSTGRES_DB=$POSTGRES_DB
+            DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/$POSTGRES_DB
+            JWT_SECRET=$EXISTING_JWT
+            SCRAPER_API_KEY=$EXISTING_SCRAPER_KEY
+            DISCORD_WEBHOOK_URL=$EXISTING_DISCORD_WEBHOOK
             EOF
             sed -i 's/^[[:space:]]*//' .env
 
-            if docker compose version >/dev/null 2>&1; then
-              COMPOSE="docker compose"
-            else
-              COMPOSE="docker-compose"
-            fi
-            $COMPOSE up -d db
+            echo "🐳 Starting database container..."
+            docker compose pull db || true
+            docker compose up -d db
 
+            echo "📦 Installing dependencies..."
             npm install --legacy-peer-deps
+
+            echo "📦 Generating Prisma client..."
             npx prisma generate
+            echo "🛠️ Running database migrations..."
             npx prisma migrate deploy
+
+            echo "🏗️ Building app..."
             npm run build
 
             mkdir -p logs
-            $COMPOSE up -d scraper
 
+            echo "🐳 Starting scraper container..."
+            docker compose pull scraper || true
+            docker compose up -d scraper
+
+            echo "🚀 Starting app with PM2..."
             pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
             pm2 save
-            pm2 startup systemd -u root --hp /root || true
+            pm2 startup systemd -u ${{ env.LOGIN }} --hp /root || true
 
+            echo "🌐 Configuring Nginx reverse proxy..."
             cat > /etc/nginx/sites-available/pokesnoop <<'NGINXEOF'
             server {
-                listen 80;
-                server_name _;
-                location / {
-                    proxy_pass http://localhost:3333;
-                    proxy_http_version 1.1;
-                    proxy_set_header Upgrade $http_upgrade;
-                    proxy_set_header Connection upgrade;
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_cache_bypass $http_upgrade;
-                }
+              listen 80;
+              server_name _;
+
+              location / {
+                proxy_pass http://localhost:3333;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+              }
             }
             NGINXEOF
-            sed -i 's/^[[:space:]]*//' /etc/nginx/sites-available/pokesnoop
+
             ln -sf /etc/nginx/sites-available/pokesnoop /etc/nginx/sites-enabled/pokesnoop
             rm -f /etc/nginx/sites-enabled/default
             nginx -t && systemctl reload nginx
@@ -131,6 +166,6 @@ jobs:
             ufw allow 80/tcp || true
             ufw allow 22/tcp || true
 
-            echo "Deploiement termine !"
-            echo "Site: http://$(curl -s ifconfig.me)"
+            echo "✅ Deployment completed"
+            echo "URL: http://$(curl -s ifconfig.me)"
             pm2 status
