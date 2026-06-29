@@ -10,9 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      IP:       ${{ secrets.IP_VPS }}
-      LOGIN:    ${{ secrets.LOGIN_VPS }}
-      SSH_PASS: ${{ secrets.PASSEWORD_VPS }}
+      IP:    ${{ secrets.IP_VPS }}
+      LOGIN: ${{ secrets.LOGIN_VPS }}
 
     steps:
       - name: Checkout Repository
@@ -23,7 +22,7 @@ jobs:
         with:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
-          password: ${{ env.SSH_PASS }}
+          password: ${{ secrets.PASSWORD_VPS }}
           port: 22
           script: |
             if ! command -v node > /dev/null 2>&1; then
@@ -57,7 +56,7 @@ jobs:
         with:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
-          password: ${{ env.SSH_PASS }}
+          password: ${{ secrets.PASSWORD_VPS }}
           port: 22
           source: "deploy-package/*"
           target: "~/pokesnoop"
@@ -69,7 +68,7 @@ jobs:
         with:
           host: ${{ env.IP }}
           username: ${{ env.LOGIN }}
-          password: ${{ env.SSH_PASS }}
+          password: ${{ secrets.PASSWORD_VPS }}
           port: 22
           script: |
             cd ~/pokesnoop
